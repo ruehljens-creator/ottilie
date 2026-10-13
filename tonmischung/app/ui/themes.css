@@ -1,0 +1,128 @@
+/* Farbschemata der Oberfläche (Jens 08.10.2026: umschaltbar zwischen bisher und Ottilie, dazu hoher Kontrast und
+   rot-grün-sicher; Einstellung „Persönlich › Farbschema“, Standard Ottilie). Angezeigte Namen (Jens): „ottilie“ =
+   „Ottilie Blau-Grau“, „bisher“ = „Ottilie Grau-Gelb“; die Schlüssel bleiben, weil sie in Nutzer-Einstellungen stehen. Die Stylesheets benutzen nur diese Rollen;
+   „bisher“ belegt sie mit genau den Farben vor der Umstellung. Ein Test prüft, dass jedes Schema jede Rolle setzt und
+   die Kontraste für Text, Hauptknopf und Fokus reichen. „ottilie_hell“ (Jens 09.10.2026: „Ottilie hell“): dieselben
+   Farben Marine und Cerulean auf hellem Grund; `--on-raise` ist die Schrift auf gewählten Reitern und Seiten (in den
+   dunklen Schemata Weiß). */
+
+:root, :root[data-theme="bisher"] {
+  --page: #0F1113; --app: #1B1D21; --topbar: #141619; --nav: #16181B; --panel: #1E2126; --field: #15171A;
+  --raise: #2C3036; --raise-hover: #363B42; --row-hover: #22252A; --side-hover: #23262B;
+  --sel: #2A2E34; --tag: #2A2F36;
+  --line: #2A2E33; --line-soft: #262A2F; --line-card: #2F343A; --line-ctrl: #3A3F46; --line-opt: #33383F;
+  --line-strong: #4A5058; --ctrl-border: #737A84; --box-border: #6B717A;
+  --text: #ECEAE6; --text-2: #C9CDD3; --muted: #A7ACB4; --muted-2: #949AA3; --faint: #80868E;
+  --white: #FFFFFF; --colgroup: #CCCCCC;
+  --accent: #F2B233; --accent-hover: #F7C866; --on-accent: #1A1405; --accent-soft: #2A2618; --accent-text: #F7D57A;
+  --accent-soft-2: #3F3413; --focus: #F2B233;
+  --ok: #3FC47E; --ok-strong: #2E6B4E; --ok-bg: #1C3A2C; --ok-text: #94E3B9; --ok-banner-text: #C4F0D8;
+  --warn-bg: #40301C; --warn-text: #FAD9B0; --warn-pill-text: #F7C995; --warn-strong: #8A5A1C; --warn-line: #8A5A2B;
+  --info-bg: #1B2E47; --info-text: #CFE2FF; --act: #6FA8FF;
+  --bad: #E5534B; --bad-strong: #8A2E2A; --bad-text: #FFB4A8; --bad-toast: #B42318; --urgent: #FF8A5B; --dot-normal: #7A8089;
+  --lane-ot: #2F6BC6; --lane-atmo: #8FD9C1; --lane-atmo-text: #0E2A22; --lane-music: #B98BE6; --lane-music-text: #1B0F26;
+  --lane-rest: #5F656E; --overlay: rgba(15,17,19,0.6);
+  --room-free: #3FC47E; --room-busy: #F2B233; --room-act: #6FA8FF; --room-off: #80868E; --on-raise: #FFFFFF;
+}
+
+:root[data-theme="ottilie"] {
+  --page: #151D28; --app: #212D3D; --topbar: #1C2634; --nav: #1E2836; --panel: #1E2836; --field: #1A2330;
+  --raise: #2A394C; --raise-hover: #344558; --row-hover: #263446; --side-hover: #263446;
+  --sel: #2E4560; --tag: #2E3D52;
+  --line: #2F3D50; --line-soft: #2A384A; --line-card: #344558; --line-ctrl: #3E4E62; --line-opt: #3B4C61;
+  --line-strong: #4B6B8B; --ctrl-border: #8AA5C6; --box-border: #6B7F96;
+  --text: #E4EAF1; --text-2: #C9D3DE; --muted: #A9B8C8; --muted-2: #A4B4C5; --faint: #8193A6;
+  --white: #FFFFFF; --colgroup: #A9B8C8;
+  --accent: #1679B3; --accent-hover: #136CA1; --on-accent: #FFFFFF; --accent-soft: #1D3A55; --accent-text: #8FD0EE;
+  --accent-soft-2: #183A52; --focus: #6DB1DA;
+  --ok: #5CCC67; --ok-strong: #2F6B45; --ok-bg: #1E3A30; --ok-text: #8EE29A; --ok-banner-text: #CDEFD2;
+  --warn-bg: #3A3424; --warn-text: #F5DDB0; --warn-pill-text: #F0C46A; --warn-strong: #8A6A2E; --warn-line: #8A6A2E;
+  --info-bg: #23395A; --info-text: #D3E6F7; --act: #6DB1DA;
+  --bad: #EE7468; --bad-strong: #8C3A35; --bad-text: #F2B3AC; --bad-toast: #B42318; --urgent: #FF8A5B; --dot-normal: #657487;
+  --lane-ot: #2F6BC6; --lane-atmo: #8FD9C1; --lane-atmo-text: #0E2A22; --lane-music: #B98BE6; --lane-music-text: #1B0F26;
+  --lane-rest: #5F656E; --overlay: rgba(15,22,31,0.65);
+  --room-free: #5CCC67; --room-busy: #E8B54A; --room-act: #6DB1DA; --room-off: #7586A0; --on-raise: #FFFFFF;
+}
+
+/* Ottilie hell: Marine als Schrift, Cerulean als Akzent, helle Blaugrau-Flächen; Kontraste wie oben geprüft */
+:root[data-theme="ottilie_hell"] {
+  --page: #DCE4EC; --app: #F3F6F9; --topbar: #E8EEF4; --nav: #EBF0F5; --panel: #FFFFFF; --field: #FFFFFF;
+  --raise: #E2E9F0; --raise-hover: #D4DEE8; --row-hover: #EAF0F6; --side-hover: #E2E9F0;
+  --sel: #D8E7F3; --tag: #E2E9F0; --line: #D6DFE8; --line-soft: #E2E8EF; --line-card: #CFD9E3; --line-ctrl: #B4C3D2;
+  --line-opt: #C5D3E0; --line-strong: #8FA6BD; --ctrl-border: #6A7F95; --box-border: #6A7F95; --text: #17263A;
+  --text-2: #2E4157; --muted: #4E5F73; --muted-2: #4B5C70; --faint: #4E5F73; --white: #FFFFFF;
+  --colgroup: #5A6B7E; --accent: #1679B3; --accent-hover: #136CA1; --on-accent: #FFFFFF; --accent-soft: #E3F0F8;
+  --accent-text: #0D5683; --accent-soft-2: #D3E7F4; --focus: #1679B3; --ok: #2E8B4A; --ok-strong: #2F6B45;
+  --ok-bg: #E2F3E6; --ok-text: #1D5530; --ok-banner-text: #174A28; --warn-bg: #FFF3D9; --warn-text: #5A400C;
+  --warn-pill-text: #6A4A0E; --warn-strong: #8A6A2E; --warn-line: #E2C27A; --info-bg: #E3F0F8; --info-text: #123E5E;
+  --act: #1679B3; --bad: #B3261E; --bad-strong: #8C3A35; --bad-text: #9A2A22;
+  --bad-toast: #B42318; --urgent: #C2410C; --dot-normal: #8A9BAD; --lane-ot: #2F6BC6; --lane-atmo: #8FD9C1;
+  --lane-atmo-text: #0E2A22; --lane-music: #B98BE6; --lane-music-text: #1B0F26; --lane-rest: #5F656E;
+  --overlay: rgba(23,38,58,0.45); --room-free: #2E8B4A; --room-busy: #A86E12; --room-act: #1679B3;
+  --room-off: #6F7F92; --on-raise: #17263A;
+}
+
+/* Hoher Kontrast: Schwarz und Weiß, Gelb für Auswahl, Hauptaktion und Fokus; stärkere Linien (unten) */
+:root[data-theme="kontrast"] {
+  --page: #000000; --app: #000000; --topbar: #000000; --nav: #000000; --panel: #000000; --field: #000000;
+  --raise: #1A1A1A; --raise-hover: #333333; --row-hover: #1F1F1F; --side-hover: #1F1F1F;
+  --sel: #262626; --tag: #262626;
+  --line: #FFFFFF; --line-soft: #8C8C8C; --line-card: #FFFFFF; --line-ctrl: #FFFFFF; --line-opt: #BFBFBF;
+  --line-strong: #FFFFFF; --ctrl-border: #FFFFFF; --box-border: #FFFFFF;
+  --text: #FFFFFF; --text-2: #FFFFFF; --muted: #E6E6E6; --muted-2: #E6E6E6; --faint: #C8C8C8;
+  --white: #FFFFFF; --colgroup: #FFFFFF;
+  --accent: #FFD60A; --accent-hover: #FFE45C; --on-accent: #000000; --accent-soft: #332B00; --accent-text: #FFD60A;
+  --accent-soft-2: #332B00; --focus: #FFD60A;
+  --ok: #4DFF88; --ok-strong: #00702F; --ok-bg: #002B12; --ok-text: #6DFF9C; --ok-banner-text: #FFFFFF;
+  --warn-bg: #2E1C00; --warn-text: #FFFFFF; --warn-pill-text: #FFB366; --warn-strong: #8A5A00; --warn-line: #FFA94D;
+  --info-bg: #002236; --info-text: #FFFFFF; --act: #5CD6FF;
+  --bad: #FF6B6B; --bad-strong: #A00000; --bad-text: #FFB0B0; --bad-toast: #B00000; --urgent: #FF9966; --dot-normal: #C8C8C8;
+  --lane-ot: #2F6BC6; --lane-atmo: #8FD9C1; --lane-atmo-text: #002217; --lane-music: #D3A6FF; --lane-music-text: #1B0F26;
+  --lane-rest: #5A5A5A; --overlay: rgba(0,0,0,0.85);
+  --room-free: #4DFF88; --room-busy: #FFA94D; --room-act: #5CD6FF; --room-off: #C8C8C8; --on-raise: #FFFFFF;
+}
+
+/* Rot-Grün-sicher (Okabe-Ito): Blau frei/bereit, Orange in Mischung/Warnung, Purpur Import/Export/Hinweis,
+   Zinnober Fehler; kein Rot-Grün-Paar trägt Bedeutung, dazu Formen (unten) */
+:root[data-theme="rotgruen"] {
+  --page: #151D28; --app: #212D3D; --topbar: #1C2634; --nav: #1E2836; --panel: #1E2836; --field: #1A2330;
+  --raise: #2A394C; --raise-hover: #344558; --row-hover: #263446; --side-hover: #263446;
+  --sel: #2E4560; --tag: #2E3D52;
+  --line: #2F3D50; --line-soft: #2A384A; --line-card: #344558; --line-ctrl: #3E4E62; --line-opt: #3B4C61;
+  --line-strong: #4B6B8B; --ctrl-border: #8AA5C6; --box-border: #6B7F96;
+  --text: #E4EAF1; --text-2: #C9D3DE; --muted: #A9B8C8; --muted-2: #A4B4C5; --faint: #8193A6;
+  --white: #FFFFFF; --colgroup: #A9B8C8;
+  --accent: #1679B3; --accent-hover: #136CA1; --on-accent: #FFFFFF; --accent-soft: #1D3A55; --accent-text: #FFFFFF;
+  --accent-soft-2: #3A4A60; --focus: #6DB1DA;
+  --ok: #56B4E9; --ok-strong: #1F5F86; --ok-bg: #17344A; --ok-text: #9AD3F2; --ok-banner-text: #D3ECFA;
+  --warn-bg: #3A2E14; --warn-text: #F7DDB0; --warn-pill-text: #F5BC4A; --warn-strong: #9A6A00; --warn-line: #9A6A00;
+  --info-bg: #33243A; --info-text: #F0D6E6; --act: #CC79A7;
+  --bad: #E8743A; --bad-strong: #A84A12; --bad-text: #F7B98F; --bad-toast: #A84A12; --urgent: #E69F00; --dot-normal: #657487;
+  --lane-ot: #2F6BC6; --lane-atmo: #8FD9C1; --lane-atmo-text: #0E2A22; --lane-music: #B98BE6; --lane-music-text: #1B0F26;
+  --lane-rest: #5F656E; --overlay: rgba(15,22,31,0.65);
+  --room-free: #56B4E9; --room-busy: #E69F00; --room-act: #CC79A7; --room-off: #8A94A0; --on-raise: #FFFFFF;
+}
+
+/* Raumzustände: Farbe aus der Rolle; bei hohem Kontrast und rot-grün-sicher zusätzlich die Form
+   (Kreis frei, Raute in Mischung, Quadrat Import/Export, Ring nicht erreichbar) */
+.dot.st-frei { background: var(--room-free); }
+.dot.st-mischt { background: var(--room-busy); }
+.dot.st-importiert, .dot.st-exportiert { background: var(--room-act); }
+.dot.st-offline { background: var(--room-off); }
+:root[data-theme="kontrast"] .dot.st-mischt, :root[data-theme="rotgruen"] .dot.st-mischt { border-radius: 1px; transform: rotate(45deg) scale(0.85); }
+:root[data-theme="kontrast"] .dot.st-importiert, :root[data-theme="rotgruen"] .dot.st-importiert,
+:root[data-theme="kontrast"] .dot.st-exportiert, :root[data-theme="rotgruen"] .dot.st-exportiert { border-radius: 2px; }
+:root[data-theme="kontrast"] .dot.st-offline, :root[data-theme="rotgruen"] .dot.st-offline {
+  background: transparent; box-shadow: inset 0 0 0 2px var(--room-off); }
+:root[data-theme="kontrast"] .dot.bad, :root[data-theme="rotgruen"] .dot.bad { border-radius: 2px; }
+
+/* Hoher Kontrast: doppelt so starke Linien, deutlicher Fokus und deutliche Auswahl */
+:root[data-theme="kontrast"] .btn, :root[data-theme="kontrast"] .inp, :root[data-theme="kontrast"] .chip,
+:root[data-theme="kontrast"] .seg, :root[data-theme="kontrast"] .opt, :root[data-theme="kontrast"] .mv { border-width: 2px; }
+:root[data-theme="kontrast"] :focus-visible { outline: 3px solid var(--focus) !important; outline-offset: 2px; }
+:root[data-theme="kontrast"] .row.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Ottilie und rot-grün-sicher: Cerulean als Fläche hat gegen den Navy-Grund nur 2,9:1 – Hauptknöpfe bekommen
+   deshalb den hellen Fokus-Ton als Rand, Fortschrittsbalken das hellere Blau (bzw. Purpur) */
+:root[data-theme="ottilie"] .btn.pri, :root[data-theme="rotgruen"] .btn.pri { border-color: var(--focus); }
+:root[data-theme="ottilie"] .bar span, :root[data-theme="rotgruen"] .bar span { background: var(--act); }

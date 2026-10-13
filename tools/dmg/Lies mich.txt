@@ -1,0 +1,45 @@
+OTTILIE – Tonmischung mit Helmut und Pro Tools
+==============================================
+
+Ottilie ist die Mac-App für die Tonmischung mit Helmut und Pro Tools. Alles zum Betrieb ist in der App enthalten
+(ffmpeg, MediaInfo, bmx, Schrift IBM Plex) – es muss nichts weiter installiert werden außer Pro Tools.
+
+
+1. Installieren
+---------------
+- „Ottilie.app“ auf „Programme“ ziehen.
+- Im Haus verteilt die IT die App über die Geräteverwaltung (MDM, siehe Ordner „Für die IT“).
+
+
+2. Voraussetzungen
+------------------
+- Pro Tools mit eingeschaltetem PTSL (Pro Tools Scripting Library); getestet mit Pro Tools 2026.4.
+- macOS {MACOS} oder neuer; {ARCH}.
+- Für Holen und Zurückliefern: Zugang zu Helmut (Zugangsdaten nur im Schlüsselbund, nie in Dateien).
+
+
+3. Erster Start
+---------------
+- Die App ist noch nicht mit dem Zertifikat des Hauses signiert. Ohne Verteilung über die Geräteverwaltung blockt
+  macOS den ersten Start: Systemeinstellungen > Datenschutz & Sicherheit > „Trotzdem öffnen“.
+- macOS fragt einmal nach Freigaben – bitte erlauben:
+    * Automation „System Events“ (beantwortet Pro-Tools-Dialoge wie „Missing Files“ nach Einstellung),
+    * Bedienungshilfen (Tastenkürzel für Punch-In),
+    * lokales Netzwerk (Raumübersicht zwischen den Mischräumen).
+- „Wer arbeitet hier?“: Nutzer wählen oder anlegen. Mit dem Häkchen „Auf diesem Mac automatisch anmelden“ entfällt
+  die Frage künftig.
+
+
+4. Einstellungen
+----------------
+- Einstellungen > System > Räume & Nutzer: Raum dieses Macs zuordnen, Nutzer verwalten, Ablage der Nutzer
+  (lokal oder gemeinsamer Ordner).
+- Einstellungen > Persönlich > Meine Templates: Pro-Tools-Templates hochladen, Standard festlegen.
+- Einstellungen > System > Über Ottilie: mitgelieferte Software, Lizenzen, Quelltext-Links.
+
+
+5. Entfernen
+------------
+- App beenden (Menüleiste > Beenden) und „Ottilie.app“ aus „Programme“ löschen.
+- Einstellungen und Nutzer liegen unter ~/Library/Application Support/Ottilie, Protokolle unter
+  ~/Library/Logs/Ottilie.

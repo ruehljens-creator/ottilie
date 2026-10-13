@@ -1,0 +1,3 @@
+[submodule "vendor/punchbuddy"]
+	path = vendor/punchbuddy
+	url = https://github.com/ruehljens-creator/punchbuddy-protools.git

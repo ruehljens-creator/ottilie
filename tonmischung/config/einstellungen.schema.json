@@ -1,0 +1,2626 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ottilie:einstellungen-schema",
+  "title": "Ottilie – Einstellungen",
+  "description": "Gruppierung wie in der Funktionsbeschreibung (Persönlich, Import, Export und Auslieferung, System) und im Prototyp. Jedes Feld trägt 'x-quelle'. Ein Feld ohne eigenes 'x-quelle' erbt den Wert der nächsthöheren Gruppe. Werte: 'mdm' = festes Konfigurationsprofil der Geräteverwaltung je Mac (verwaltete Voreinstellungen, in der App nur lesbar und gesperrt angezeigt); 'helmut' = veränderliche gemeinsame Daten, zentral für alle Macs (Helmut, später wahlweise optionale Datenbank), Änderung nur mit Admin-Recht; 'helmut-nutzer' = persönliche Daten im Helmut-Nutzerprofil (später wahlweise Datenbank), Rückfall lokal; 'lokal' = nur dieser Mac. Rangfolge beim Lesen: mdm > helmut/helmut-nutzer > lokal > default (Hausstandard). 'x-punchbuddy' nennt den vorhandenen Schlüssel der Produktivversion punchbuddy-protools 2.0.2 (~/.punchbuddy/settings.json), 'x-punchbuddy-helmut' einen Schlüssel, den es nur im ungetesteten Arbeitsstand punchbuddy-helmut gibt (Grundlage für die spätere Zusammenführung). Felder mit 'x-ab' sind vorbereitet, wirken aber noch nicht; das Fenster blendet sie aus ('noch ohne Funktion' bzw. die Ausbaustufe, die sie bringt).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "x-quelle": "lokal"
+    },
+    "persoenlich": {
+      "title": "Persönlich",
+      "type": "object",
+      "x-quelle": "helmut-nutzer",
+      "properties": {
+        "farbschema": {
+          "title": "Farbschema",
+          "type": "string",
+          "enum": [
+            "ottilie",
+            "ottilie_hell",
+            "bisher",
+            "kontrast",
+            "rotgruen"
+          ],
+          "x-labels": [
+            "Ottilie Blau-Grau",
+            "Ottilie hell",
+            "Ottilie Grau-Gelb",
+            "Hoher Kontrast (Schwarz, Weiß, Gelb)",
+            "Rot-Grün-sicher (Blau, Orange, Purpur, mit Formen)"
+          ],
+          "default": "ottilie",
+          "description": "Farben der Oberfläche; gilt für den angemeldeten Nutzer an allen Macs. Bedienung, Beschriftungen und Ansagen bleiben gleich. Ottilie hell: Blau-Grau auf hellem Grund. Hoher Kontrast: Schwarz und Weiß, Gelb für Auswahl und Fokus, stärkere Linien. Rot-Grün-sicher: Zustände in Blau, Orange und Purpur, Raumzustände zusätzlich mit Formen."
+        },
+        "templates": {
+          "x-eigene-ansicht": true,
+          "title": "Meine Templates",
+          "description": "Liste des angemeldeten Nutzers; gilt an allen Macs. PTSL kann Templates nicht auflisten, gefundene Templates liest die App aus dem Templateordner.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/template"
+          }
+        },
+        "standard_template_id": {
+          "x-eigene-ansicht": true,
+          "title": "Standard",
+          "type": "string",
+          "default": ""
+        },
+        "vorschlag_nach_sendung": {
+          "title": "Pro Sendung das dort zuletzt benutzte Template vorschlagen",
+          "type": "boolean",
+          "default": true,
+          "x-hinweis": "Vorrang: zuletzt für diese Sendung benutztes Template, dann ein eigenes Template mit dieser Sendung, dann der Standard."
+        },
+        "zuletzt_je_sendung": {
+          "title": "Zuletzt benutztes Template je Sendung (wird von der App geschrieben)",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "gelernte_korrekturen": {
+          "title": "Gelernte Korrekturen",
+          "description": "Einträge aus 'Korrektur als Regel merken'; exportierbar, von Kolleginnen übernehmbar.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "match",
+              "kategorie"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "match": {
+                "type": "string",
+                "description": "z. B. Quelle enthält 'Sprecher_' oder Spurname 'Stadion'"
+              },
+              "art": {
+                "enum": [
+                  "quelle_enthaelt",
+                  "spurname_gleich",
+                  "spurname_enthaelt"
+                ]
+              },
+              "kategorie": {
+                "$ref": "#/$defs/kategorie"
+              }
+            }
+          },
+          "x-ab": "noch ohne Funktion"
+        }
+      }
+    },
+    "aufnahme": {
+      "title": "Aufnahme & Wiedergabe",
+      "type": "object",
+      "x-quelle": "lokal",
+      "description": "Punch-In, Wiedergabe, Audio verschieben und Spur-Presets.",
+      "properties": {
+        "spuren": {
+          "title": "Spuren",
+          "type": "object",
+          "properties": {
+            "rec_a": {
+              "title": "Record A – Aufnahmespuren",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "ST",
+                "A  IT",
+                "OGA",
+                "Mus",
+                "Spr",
+                "Spr 2"
+              ],
+              "x-punchbuddy": "tracks"
+            },
+            "monitor_a": {
+              "title": "Record A – Abhörspuren",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "ST",
+                "A  IT",
+                "OGA",
+                "Mus",
+                "Spr"
+              ],
+              "x-punchbuddy": "monitor_tracks",
+              "description": "wird nur in Presets mitgeführt"
+            },
+            "rec_b": {
+              "title": "Record B – Aufnahmespuren",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "x-punchbuddy": "tracks_b",
+              "description": "leer = Record B nicht belegt"
+            },
+            "monitor_b": {
+              "title": "Record B – Abhörspuren",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "x-punchbuddy": "monitor_tracks_b",
+              "description": "wird nur in Presets mitgeführt"
+            },
+            "play_input": {
+              "title": "Play Input – Spuren",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "x-punchbuddy": "play_monitor_tracks",
+              "description": "leer = die in Pro Tools ausgewählten Spuren"
+            }
+          }
+        },
+        "play_custom": {
+          "title": "Play Custom",
+          "type": "object",
+          "description": "Schaltet beim Start und Stopp der Wiedergabe zwei Spuren stumm bzw. laut.",
+          "properties": {
+            "kanal_1_spur": {
+              "title": "Kanal 1 – Spur",
+              "type": "string",
+              "default": "KH2",
+              "x-punchbuddy": "play_custom_ch1_track"
+            },
+            "kanal_1_stumm_bei_start": {
+              "title": "Kanal 1 – stumm beim Start",
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy": "play_custom_ch1_mute_start"
+            },
+            "kanal_1_stumm_bei_stopp": {
+              "title": "Kanal 1 – stumm beim Stopp",
+              "type": "boolean",
+              "default": false,
+              "x-punchbuddy": "play_custom_ch1_mute_stop"
+            },
+            "kanal_2_spur": {
+              "title": "Kanal 2 – Spur",
+              "type": "string",
+              "default": "ST Abh",
+              "x-punchbuddy": "play_custom_ch2_track"
+            },
+            "kanal_2_stumm_bei_start": {
+              "title": "Kanal 2 – stumm beim Start",
+              "type": "boolean",
+              "default": false,
+              "x-punchbuddy": "play_custom_ch2_mute_start"
+            },
+            "kanal_2_stumm_bei_stopp": {
+              "title": "Kanal 2 – stumm beim Stopp",
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy": "play_custom_ch2_mute_stop"
+            }
+          }
+        },
+        "audio_verschieben": {
+          "title": "Audio verschieben",
+          "type": "object",
+          "description": "Verschiebt das Material der Quellspuren auf die Zielspuren (gleiche Zeitposition), je Paar.",
+          "properties": {
+            "quellspuren": {
+              "title": "Quellspuren",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "x-punchbuddy": "move_audio_source_tracks"
+            },
+            "zielspuren": {
+              "title": "Zielspuren",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "x-punchbuddy": "move_audio_target_tracks"
+            }
+          }
+        },
+        "presets": {
+          "title": "Spur-Presets",
+          "type": "array",
+          "description": "Laden per Befehl „preset <Nr.>“ bzw. Webtrigger /preset/<Nr.> (1 = erstes).",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "rec_a": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "mon_a": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "rec_b": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "mon_b": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "export": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": [
+            {
+              "name": "Preset 1",
+              "rec_a": [],
+              "mon_a": [],
+              "rec_b": [],
+              "mon_b": [],
+              "export": []
+            },
+            {
+              "name": "Preset 2",
+              "rec_a": [],
+              "mon_a": [],
+              "rec_b": [],
+              "mon_b": [],
+              "export": []
+            },
+            {
+              "name": "Preset 3",
+              "rec_a": [],
+              "mon_a": [],
+              "rec_b": [],
+              "mon_b": [],
+              "export": []
+            },
+            {
+              "name": "Preset 4",
+              "rec_a": [],
+              "mon_a": [],
+              "rec_b": [],
+              "mon_b": [],
+              "export": []
+            },
+            {
+              "name": "Preset 5",
+              "rec_a": [],
+              "mon_a": [],
+              "rec_b": [],
+              "mon_b": [],
+              "export": []
+            },
+            {
+              "name": "Preset 6",
+              "rec_a": [],
+              "mon_a": [],
+              "rec_b": [],
+              "mon_b": [],
+              "export": []
+            },
+            {
+              "name": "Preset 7",
+              "rec_a": [],
+              "mon_a": [],
+              "rec_b": [],
+              "mon_b": [],
+              "export": []
+            },
+            {
+              "name": "Preset 8",
+              "rec_a": [],
+              "mon_a": [],
+              "rec_b": [],
+              "mon_b": [],
+              "export": []
+            }
+          ],
+          "x-punchbuddy": "track_presets"
+        }
+      }
+    },
+    "import": {
+      "title": "Import",
+      "type": "object",
+      "x-quelle": "helmut",
+      "description": "Die Bereiche Zuordnungsregeln bis Import & Vorschau gelten wahlweise für alle Templates oder je Template ('profile_je_template').",
+      "properties": {
+        "zuordnungsregeln": {
+          "type": "object",
+          "properties": {
+            "aktiv": {
+              "title": "AAF-Triage aktiv",
+              "type": "boolean",
+              "default": true,
+              "description": "Aus: AAF-Spuren kommen per Match Tracks auf die gleichnamigen Template-Spuren; fehlende Spuren werden erfragt (ab A11, zuordnen, weglassen). Jens, 02.10.2026."
+            },
+            "kaskade": {
+              "title": "Regelkaskade (erste sichere Regel gewinnt)",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "premiere_spurname",
+                      "quelldatei_herkunft",
+                      "kanalregel_kameratyp",
+                      "inhaltserkennung"
+                    ]
+                  },
+                  "aktiv": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "default": [
+                {
+                  "id": "premiere_spurname",
+                  "aktiv": true
+                },
+                {
+                  "id": "quelldatei_herkunft",
+                  "aktiv": true
+                },
+                {
+                  "id": "kanalregel_kameratyp",
+                  "aktiv": true
+                },
+                {
+                  "id": "inhaltserkennung",
+                  "aktiv": true
+                }
+              ]
+            },
+            "mindest_sicherheit": {
+              "title": "Mindest-Sicherheit (%)",
+              "type": "integer",
+              "minimum": 50,
+              "maximum": 100,
+              "multipleOf": 5,
+              "default": 80
+            },
+            "schluesselwoerter": {
+              "type": "object",
+              "properties": {
+                "o_ton": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [
+                    "O-Ton",
+                    "OT",
+                    "Int",
+                    "Interview",
+                    "Funk",
+                    "Angel"
+                  ]
+                },
+                "atmo": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [
+                    "Atmo",
+                    "Amb",
+                    "SFX",
+                    "Geräusch"
+                  ]
+                },
+                "musik": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [
+                    "Musik",
+                    "Mus",
+                    "Music",
+                    "Score"
+                  ]
+                }
+              }
+            },
+            "musik_pfade": {
+              "title": "Pfade, die immer Musik sind",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "/Musikarchiv/",
+                "/Produktionsmusik/"
+              ]
+            },
+            "kanalregeln": {
+              "title": "Kanalregel pro Kameratyp",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kameratyp": {
+                    "type": "string"
+                  },
+                  "kanal_12": {
+                    "enum": [
+                      "o_ton",
+                      "atmo",
+                      "musik",
+                      "ignorieren"
+                    ]
+                  },
+                  "kanal_34": {
+                    "enum": [
+                      "o_ton",
+                      "atmo",
+                      "musik",
+                      "ignorieren"
+                    ]
+                  }
+                }
+              },
+              "default": [
+                {
+                  "kameratyp": "EB-Kamera, 4 Kanäle",
+                  "kanal_12": "o_ton",
+                  "kanal_34": "atmo"
+                },
+                {
+                  "kameratyp": "EB-Kamera, 2 Kanäle",
+                  "kanal_12": "o_ton",
+                  "kanal_34": "ignorieren"
+                },
+                {
+                  "kameratyp": "Smartphone (Mobile Reporting)",
+                  "kanal_12": "o_ton",
+                  "kanal_34": "ignorieren"
+                }
+              ],
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "zielspuren": {
+          "type": "object",
+          "properties": {
+            "bereiche": {
+              "type": "object",
+              "properties": {
+                "o_ton": {
+                  "$ref": "#/$defs/spurbereich",
+                  "default": {
+                    "von": "A1",
+                    "bis": "A4"
+                  }
+                },
+                "atmo": {
+                  "$ref": "#/$defs/spurbereich",
+                  "default": {
+                    "von": "A5",
+                    "bis": "A10"
+                  }
+                },
+                "musik": {
+                  "$ref": "#/$defs/spurbereich",
+                  "default": {
+                    "von": "Musik1",
+                    "bis": "Musik8"
+                  }
+                },
+                "rest": {
+                  "$ref": "#/$defs/spurbereich",
+                  "default": {
+                    "von": "A11",
+                    "bis": ""
+                  },
+                  "x-hinweis": "„bis“ leer = alle vorhandenen Spuren ab „von“ (Jens: ab A11 und folgende; keine neue Spur anlegen)"
+                }
+              }
+            },
+            "wenn_voll": {
+              "title": "Wenn die Zielspuren einer Gruppe voll sind",
+              "enum": [
+                "reservespuren",
+                "verwandte_kategorie",
+                "nachfragen"
+              ],
+              "x-labels": [
+                "Auf die Reservespuren (Rest)",
+                "Auf die folgenden Spuren der nächsten Gruppe (O-Ton → Atmo → Musik → Rest)",
+                "In der Vorschau nachfragen (vorerst wie Reservespuren)"
+              ],
+              "default": "reservespuren"
+            },
+            "stereo_teilen_wenn_kanal_leer": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy-helmut": "aaf_mono_split",
+              "x-ab": "noch ohne Funktion"
+            },
+            "stille_spuren_weglassen": {
+              "type": "boolean",
+              "default": false,
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "spurprofile": {
+          "title": "Spurprofile je Template",
+          "x-abschnitt": true,
+          "description": "Je Template: welche Spuren Triage-Ziel (O-Ton, Atmo, Musik, Rest) sind, welche nach dem Import ausgeblendet werden, wenn sie leer sind, welche exportiert und lautheitskorrigiert werden (mit Kanälen im Sendefile) und welche für Aufnahme und Abhören dienen. Die Spuren werden aus der offenen Pro-Tools-Session gelesen. Ohne Profil gelten Zielspuren, Spurtabelle und Aufnahmespuren wie bisher.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/spurprofil"
+          },
+          "default": []
+        },
+        "timecode_startband": {
+          "type": "object",
+          "properties": {
+            "programmbeginn": {
+              "$ref": "#/$defs/timecode",
+              "default": "10:00:00:00",
+              "x-punchbuddy-helmut": "aaf_tc_mapping_start",
+              "x-punchbuddy": "export_start_tc"
+            },
+            "startband_max_s": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 30
+            },
+            "erkennung": {
+              "type": "object",
+              "properties": {
+                "clipnamen": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-ab": "noch ohne Funktion"
+                },
+                "balken_und_ton": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-ab": "noch ohne Funktion"
+                },
+                "fester_vorlauf": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-ab": "noch ohne Funktion"
+                }
+              }
+            },
+            "bei_startband": {
+              "enum": [
+                "offset_automatisch",
+                "in_vorschau_bestaetigen",
+                "sequenz_tc_unveraendert"
+              ],
+              "default": "offset_automatisch",
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "import_vorschau": {
+          "type": "object",
+          "properties": {
+            "triage_vorschau": {
+              "enum": [
+                "immer",
+                "nur_bei_unsicherheit",
+                "nie"
+              ],
+              "default": "nur_bei_unsicherheit"
+            },
+            "medien": {
+              "enum": [
+                "kopieren",
+                "verlinken",
+                "konsolidieren_mit_handles"
+              ],
+              "default": "kopieren",
+              "x-punchbuddy-helmut": "aaf_audio_options",
+              "x-ab": "noch ohne Funktion"
+            },
+            "handles_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 2000,
+              "x-entwicklung": "Prototyp hat unter 'AAF-Import (Helmut)' zusätzlich Handles = 0 ms. Vorschlag: nur ein Feld.",
+              "x-punchbuddy-helmut": "aaf_handle_size_ms",
+              "x-ab": "noch ohne Funktion"
+            },
+            "clip_gain_uebernehmen": {
+              "type": "boolean",
+              "default": true,
+              "title": "Clip Gain aus dem AAF übernehmen",
+              "description": "Lautstärke der einzelnen Clips aus dem Schnitt. Gehört zu den Clips, die Spuren bleiben unverändert."
+            },
+            "automation_uebernehmen": {
+              "type": "boolean",
+              "default": true,
+              "title": "Lautstärke-Automation aus dem AAF übernehmen",
+              "description": "Lautstärke-Automation aus dem Schnitt auf die Spuren übernehmen (Vorgabe Jens 03.10.2026: Clips, Clip Gain und Volume Automation)."
+            },
+            "trackdaten_preset": {
+              "title": "Spurdaten beim AAF-Import (Pro-Tools-Preset)",
+              "description": "Preset aus Pro Tools (Dialog „Import Session Data“ › Track Data to Import). Vorgabe „Ottilie Clips und Automation“ bringt die App mit und legt es bei Bedarf im Pro-Tools-Ordner an: Clips, Clip Gain und Lautstärke-Automation kommen auf die Spuren, Farbe und Höhe der Template-Spuren bleiben. Ohne Preset übernimmt Pro Tools Spureigenschaften aus dem AAF.",
+              "type": "string",
+              "default": "Ottilie Clips und Automation"
+            },
+            "fehlende_dateien": {
+              "title": "Dialog „Missing Files“ in Pro Tools",
+              "description": "Fehlt nach dem AAF-Import eine Datei (z. B. die Video-Verknüpfung des AAF), fragt Pro Tools mit dem Dialog „Missing Files“. Vorgabe (Jens 03.10.2026): automatisch suchen und verknüpfen. Bei „selbst bestätigen“ wartet die App, bis der Dialog in Pro Tools bestätigt ist.",
+              "enum": [
+                "automatisch_suchen",
+                "alle_ueberspringen",
+                "selbst_bestaetigen"
+              ],
+              "x-labels": [
+                "Automatisch suchen und verknüpfen (Automatically Find & Relink)",
+                "Alle überspringen (Skip All)",
+                "Selbst in Pro Tools bestätigen – die App wartet"
+              ],
+              "default": "automatisch_suchen"
+            },
+            "original_aaf_ablegen": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "triage_bericht_an_helmut": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "spuren_mit_clips_einblenden": {
+              "title": "Nach dem Import A- und Musik-Spuren mit Clips einblenden",
+              "description": "Ausgeblendete A- und Musik-Spuren mit Clips werden eingeblendet, ihre Ordnerspuren aufgeklappt. Stems, Spr und Video bleiben, wie sie sind.",
+              "type": "boolean",
+              "default": true
+            },
+            "leere_spuren_ausblenden": {
+              "title": "Nach dem Import leere A- und Musik-Spuren ausblenden",
+              "description": "Nur A- und Musik-Spuren ohne Clips (Vorsilben aus den Zielspuren der Triage). Stems, Spr, Video und alle anderen Spuren bleiben immer erhalten.",
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
+        "aaf_import": {
+          "title": "AAF-Import (Helmut)",
+          "type": "object",
+          "properties": {
+            "tc_lage": {
+              "enum": [
+                "map_to_fixed",
+                "maintain_absolute",
+                "maintain_relative"
+              ],
+              "default": "map_to_fixed",
+              "x-punchbuddy-helmut": "aaf_tc_policy",
+              "x-ab": "noch ohne Funktion"
+            },
+            "soll_startzeit": {
+              "$ref": "#/$defs/timecode",
+              "default": "10:00:00:00",
+              "x-ab": "noch ohne Funktion"
+            },
+            "ueber_ptsl": {
+              "type": "boolean",
+              "default": true,
+              "x-entwicklung": "Den AAF-Import gibt es in punchbuddy-protools nicht; nur im Arbeitsstand punchbuddy-helmut (PTSL- und UI-Weg).",
+              "x-punchbuddy-helmut": "aaf_import_mode",
+              "x-ab": "noch ohne Funktion"
+            },
+            "pse_voranalyse": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy-helmut": "pse_background",
+              "x-ab": "noch ohne Funktion"
+            },
+            "zeitlimit_s": {
+              "type": "integer",
+              "default": 900,
+              "x-punchbuddy-helmut": "aaf_import_timeout",
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "session_ablage": {
+          "title": "Session-Ablage",
+          "description": "Prototyp führt sie unter Import, die Einstellungstabelle der Funktionsbeschreibung unter Export und Auslieferung.",
+          "type": "object",
+          "properties": {
+            "modus": {
+              "enum": [
+                "helmut_storage",
+                "lokal",
+                "lokal_spiegelung"
+              ],
+              "default": "lokal_spiegelung",
+              "x-entwicklung": "Prototyp-Standard ist helmut_storage. Vorschlag M0: lokal_spiegelung, bis das Testszenario Speicher und Durchsatz bestanden ist (offener Punkt 3)."
+            },
+            "ordner_im_projekt": {
+              "type": "string",
+              "default": "{projekt}/Ton/ProTools/",
+              "description": "Platzhalter {projekt} {sendung} {titel} {version}"
+            },
+            "lokaler_ordner": {
+              "type": "string",
+              "default": "/Volumes/ProTools-Lokal/Sessions/",
+              "x-quelle": "mdm",
+              "x-punchbuddy-helmut": "aaf_session_location"
+            },
+            "spiegeln": {
+              "enum": [
+                "nach_jedem_speichern",
+                "beim_export_und_schliessen",
+                "alle_n_minuten"
+              ],
+              "default": "nach_jedem_speichern"
+            },
+            "spiegel_intervall_min": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            },
+            "audiodateien_spiegeln": {
+              "enum": [
+                "neu_und_geaendert",
+                "alle"
+              ],
+              "default": "neu_und_geaendert"
+            },
+            "session_als_asset": {
+              "type": "boolean",
+              "default": true
+            },
+            "sicherungen_mitfuehren": {
+              "type": "boolean",
+              "default": true
+            },
+            "staende_anzeigen": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "sperre_ueber_helmut": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "offene_session": {
+              "title": "Import in eine offene Session",
+              "type": "object",
+              "properties": {
+                "anbieten": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "umzug": {
+                  "enum": [
+                    "kopieren",
+                    "speichern_unter",
+                    "bleibt"
+                  ],
+                  "default": "kopieren"
+                },
+                "clips": {
+                  "enum": [
+                    "neue_playlist",
+                    "einfuegen",
+                    "neue_spuren"
+                  ],
+                  "default": "neue_playlist"
+                },
+                "position": {
+                  "enum": [
+                    "programmbeginn",
+                    "nach_letztem_clip",
+                    "einfuegemarke"
+                  ],
+                  "default": "programmbeginn"
+                },
+                "bisheriger_beitrag": {
+                  "enum": [
+                    "bleibt_in_mischung",
+                    "zurueckgeben",
+                    "weitergefuehrt_markieren"
+                  ],
+                  "default": "bleibt_in_mischung"
+                }
+              }
+            },
+            "fremde_dateien": {
+              "title": "Audiodateien von außerhalb",
+              "type": "object",
+              "properties": {
+                "voreinstellung_pruefen": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-ab": "noch ohne Funktion"
+                },
+                "uebernehmen": {
+                  "enum": [
+                    "sofort",
+                    "beim_speichern",
+                    "beim_schliessen_und_export"
+                  ],
+                  "default": "sofort"
+                },
+                "abfrage_intervall_s": {
+                  "type": "integer",
+                  "default": 30
+                },
+                "unterordner": {
+                  "type": "string",
+                  "default": "Audio Files/Extern/"
+                },
+                "hochladen": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "warnen": {
+                  "type": "boolean",
+                  "default": true
+                }
+              }
+            },
+            "archiv_ordner": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "~/Downloads",
+                "~/Geräusche"
+              ],
+              "x-quelle": "lokal"
+            }
+          }
+        },
+        "profile_je_template": {
+          "title": "Abweichende Import-Einstellungen je Template ('Gilt für')",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "description": "Teilmenge von zuordnungsregeln, zielspuren, timecode_startband, import_vorschau"
+          },
+          "default": {},
+          "x-ab": "noch ohne Funktion"
+        }
+      }
+    },
+    "export": {
+      "title": "Export und Auslieferung",
+      "type": "object",
+      "x-quelle": "helmut",
+      "properties": {
+        "havarie_zielordner": {
+          "title": "Havarie-Zielordner",
+          "type": "string",
+          "default": "",
+          "description": "Wohin „Havarie: Sendefile ausliefern“ schreibt. Leer: Schreibtisch (Ordner „Ottilie Havarie“). Angeschlossene USB-Sticks kommen automatisch dazu.",
+          "x-quelle": "lokal",
+          "x-ordner": true
+        },
+        "transfer_ziele": {
+          "title": "Transfer-Ziele",
+          "description": "Ziele aus Helmut (Verbindung nur lesbar, vom Helmut-Admin gepflegt) und lokale Zusatzziele (nur dieser Mac). Passwörter nie hier, nur Schlüsselbund.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/transfer_ziel"
+          },
+          "x-punchbuddy-helmut": "transfer_targets",
+          "x-ab": "noch ohne Funktion"
+        },
+        "presets": {
+          "title": "Delivery-Presets",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/preset"
+          },
+          "x-punchbuddy-helmut": "delivery_presets",
+          "x-ab": "noch ohne Funktion"
+        },
+        "aktives_preset": {
+          "type": "string",
+          "default": "xdcam16",
+          "x-punchbuddy-helmut": "delivery_active_preset",
+          "x-ab": "noch ohne Funktion"
+        },
+        "spuren_lautheit": {
+          "title": "Spuren & Lautheit",
+          "type": "object",
+          "properties": {
+            "spurtabelle": {
+              "type": "array",
+              "description": "Reihenfolge = Kanalpaare 1/2, 3/4 … im MXF.",
+              "items": {
+                "type": "object",
+                "required": [
+                  "pt_spur",
+                  "inhalt"
+                ],
+                "properties": {
+                  "pt_spur": {
+                    "type": "string",
+                    "description": "Name der Spur in Pro Tools; leer = Kanalpaar leer"
+                  },
+                  "inhalt": {
+                    "type": "string"
+                  },
+                  "export": {
+                    "type": "boolean"
+                  },
+                  "r128": {
+                    "type": "boolean"
+                  },
+                  "exportname": {
+                    "type": "string",
+                    "description": "Name der exportierten WAV (z. B. ST); leer = Name der Pro-Tools-Spur"
+                  }
+                }
+              },
+              "default": [
+                {
+                  "pt_spur": "ST",
+                  "inhalt": "Sendeton",
+                  "export": true,
+                  "r128": true
+                },
+                {
+                  "pt_spur": "A IT",
+                  "inhalt": "IT",
+                  "export": true,
+                  "r128": false
+                },
+                {
+                  "pt_spur": "AD",
+                  "inhalt": "Audiodeskription",
+                  "export": false,
+                  "r128": false
+                },
+                {
+                  "pt_spur": "DolbyE",
+                  "inhalt": "Dolby E",
+                  "export": false,
+                  "r128": false
+                },
+                {
+                  "pt_spur": "OGA",
+                  "inhalt": "O-Töne, Geräusche, Atmo",
+                  "export": true,
+                  "r128": false
+                },
+                {
+                  "pt_spur": "Mus",
+                  "inhalt": "Musik",
+                  "export": true,
+                  "r128": false
+                },
+                {
+                  "pt_spur": "Spr",
+                  "inhalt": "Kommentar und Voice-over",
+                  "export": true,
+                  "r128": false
+                },
+                {
+                  "pt_spur": "",
+                  "inhalt": "leer",
+                  "export": false,
+                  "r128": false
+                }
+              ],
+              "x-punchbuddy": "export_tracks / loudness_tracks",
+              "x-punchbuddy-helmut": "mux_track_order"
+            },
+            "exportnamen": {
+              "title": "Exportnamen",
+              "x-auch-in": [
+                "import.spurprofile"
+              ],
+              "x-gruppe": "Auswahl für die Spalte „Exportname“",
+              "description": "Auswahl im Spurprofil (Spalte „Exportname“): Name der exportierten Datei, dazu Kanäle im Sendefile und Inhalt nach Haus-Standard. Wird eine Spur so benannt, setzt die App Kanäle und Inhalt vor.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "title": "Name"
+                  },
+                  "kanal": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "title": "Kanäle",
+                    "description": "erster Kanal (1 = 1/2)"
+                  },
+                  "inhalt": {
+                    "type": "string",
+                    "title": "Inhalt"
+                  }
+                }
+              },
+              "default": [
+                {
+                  "name": "ST",
+                  "kanal": 1,
+                  "inhalt": "Sendeton"
+                },
+                {
+                  "name": "IT",
+                  "kanal": 3,
+                  "inhalt": "IT"
+                },
+                {
+                  "name": "DoE",
+                  "kanal": 7,
+                  "inhalt": "Dolby E"
+                },
+                {
+                  "name": "AD",
+                  "kanal": 5,
+                  "inhalt": "Audiodeskription"
+                },
+                {
+                  "name": "OGA",
+                  "kanal": 9,
+                  "inhalt": "O-Töne, Geräusche, Atmo"
+                },
+                {
+                  "name": "Musik",
+                  "kanal": 11,
+                  "inhalt": "Musik"
+                },
+                {
+                  "name": "Spr",
+                  "kanal": 13,
+                  "inhalt": "Kommentar und Voice-over"
+                }
+              ]
+            },
+            "lautheit": {
+              "type": "object",
+              "properties": {
+                "aktiv": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-punchbuddy": "loudness_enabled"
+                },
+                "ziel_lufs": {
+                  "type": "number",
+                  "default": -23,
+                  "x-punchbuddy": "target_lufs"
+                },
+                "true_peak_max_dbtp": {
+                  "type": "number",
+                  "default": -3,
+                  "x-punchbuddy": "max_truepeak"
+                },
+                "verfahren": {
+                  "enum": [
+                    "offen"
+                  ],
+                  "default": "offen",
+                  "x-entwicklung": "Offener Punkt 1 – Verfahren nach Entscheidung von Jens.",
+                  "x-ab": "noch ohne Funktion"
+                }
+              }
+            },
+            "wav_export": {
+              "type": "object",
+              "properties": {
+                "format": {
+                  "enum": [
+                    "stereo_je_spur",
+                    "mono_je_kanal"
+                  ],
+                  "default": "stereo_je_spur",
+                  "x-ab": "noch ohne Funktion"
+                },
+                "konsolidieren": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-ab": "noch ohne Funktion"
+                },
+                "ueberhaenge_kuerzen": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-ab": "noch ohne Funktion"
+                },
+                "bittiefe": {
+                  "enum": [
+                    16,
+                    24
+                  ],
+                  "default": 24,
+                  "x-punchbuddy-helmut": "export_audio_bit_depth",
+                  "x-ab": "noch ohne Funktion"
+                },
+                "samplerate": {
+                  "enum": [
+                    48000
+                  ],
+                  "default": 48000,
+                  "x-punchbuddy-helmut": "export_audio_sample_rate",
+                  "x-ab": "noch ohne Funktion"
+                },
+                "verfahren": {
+                  "enum": [
+                    "offen"
+                  ],
+                  "default": "offen",
+                  "x-entwicklung": "Offener Punkt 2 – ExportClipsAsFiles, BounceTrack oder ExportMix.",
+                  "x-ab": "noch ohne Funktion"
+                }
+              }
+            },
+            "reihenfolge_wie_editor": {
+              "type": "boolean",
+              "default": false,
+              "x-ab": "noch ohne Funktion"
+            },
+            "ungelistete_anhaengen": {
+              "type": "boolean",
+              "default": false,
+              "x-punchbuddy-helmut": "mux_include_unlisted",
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "pruefung": {
+          "title": "Prüfung des Sendefiles (Havarie)",
+          "type": "object",
+          "properties": {
+            "formatpruefung": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy-helmut": "qc_enabled",
+              "title": "Sendefile vor dem Transfer prüfen",
+              "description": "Format gegen das ARD-ZDF-Profil, Ton 24 bit / 48 kHz auf allen Spuren, Timecode, Länge, MXF-Struktur, Schwarz- und Standbild"
+            },
+            "schwarzbild_ab_s": {
+              "type": "number",
+              "default": 1,
+              "x-punchbuddy-helmut": "qc_black_min_seconds",
+              "title": "Schwarzbild melden ab (s)",
+              "description": "Summe aller Schwarzbild-Abschnitte"
+            },
+            "standbild_ab_s": {
+              "type": "number",
+              "default": 5,
+              "title": "Standbild melden ab (s)"
+            },
+            "pegel_r103": {
+              "enum": [
+                "aus",
+                "warnen",
+                "fehler"
+              ],
+              "default": "warnen",
+              "x-ab": "noch ohne Funktion"
+            },
+            "laenge_gleich": {
+              "type": "boolean",
+              "default": true,
+              "title": "Bild und Ton gleich lang (± 40 ms)"
+            },
+            "bei_fehler": {
+              "enum": [
+                "stoppen",
+                "freigabe_anfordern",
+                "nur_protokollieren"
+              ],
+              "default": "stoppen",
+              "x-punchbuddy-helmut": "qc_block_transfer_on_fail",
+              "title": "Wenn die Prüfung einen Fehler findet",
+              "x-labels": [
+                "Nicht übertragen",
+                "Mischer entscheidet",
+                "Nur im Bericht vermerken, trotzdem übertragen"
+              ]
+            },
+            "ergebnis_an_projekt": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "pse": {
+          "title": "PSE (ITU-R BT.1702)",
+          "type": "object",
+          "properties": {
+            "pruefen": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy-helmut": "qc_pse_check",
+              "x-ab": "noch ohne Funktion"
+            },
+            "voranalyse": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy-helmut": "pse_background",
+              "x-ab": "noch ohne Funktion"
+            },
+            "hardware_dekodierung": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy-helmut": "pse_hwaccel",
+              "x-ab": "noch ohne Funktion"
+            },
+            "niedrige_prioritaet": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "threads": {
+              "type": "integer",
+              "default": 2,
+              "x-quelle": "lokal",
+              "x-punchbuddy-helmut": "pse_bg_threads",
+              "x-ab": "noch ohne Funktion"
+            },
+            "zwischenspeichern": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "regel_334ms": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "korrekturfilter_anbieten": {
+              "type": "boolean",
+              "default": false,
+              "x-punchbuddy-helmut": "pse_autocorrect",
+              "x-ab": "noch ohne Funktion"
+            },
+            "bei_befund": {
+              "enum": [
+                "stoppen",
+                "freigabe_anfordern",
+                "nur_protokollieren"
+              ],
+              "default": "stoppen",
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "baton": {
+          "type": "object",
+          "properties": {
+            "aktiv": {
+              "type": "boolean",
+              "default": false,
+              "x-punchbuddy-helmut": "qc_baton_enabled",
+              "x-ab": "noch ohne Funktion"
+            },
+            "modus": {
+              "enum": [
+                "watchfolder",
+                "rest"
+              ],
+              "default": "watchfolder",
+              "x-punchbuddy-helmut": "baton_mode",
+              "x-ab": "noch ohne Funktion"
+            },
+            "eingangsordner": {
+              "type": "string",
+              "x-quelle": "mdm",
+              "x-punchbuddy-helmut": "baton_watch_in",
+              "x-ab": "noch ohne Funktion"
+            },
+            "ergebnisordner": {
+              "type": "string",
+              "x-quelle": "mdm",
+              "x-punchbuddy-helmut": "baton_report_dir",
+              "x-ab": "noch ohne Funktion"
+            },
+            "timeout_s": {
+              "type": "integer",
+              "default": 600,
+              "x-punchbuddy-helmut": "baton_timeout",
+              "x-ab": "noch ohne Funktion"
+            },
+            "testplan": {
+              "type": "string",
+              "x-punchbuddy-helmut": "baton_test_plan",
+              "x-ab": "noch ohne Funktion"
+            },
+            "rest_adresse": {
+              "type": "string",
+              "x-quelle": "mdm",
+              "x-punchbuddy-helmut": "baton_api_url",
+              "x-ab": "noch ohne Funktion"
+            },
+            "rest_zugang_schluesselbund": {
+              "type": "string",
+              "x-quelle": "mdm",
+              "x-entwicklung": "PunchBuddy speichert baton_api_password heute im Klartext – entfällt.",
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "jobs": {
+          "title": "Auslieferungs-Jobs deliver 1–8",
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "preset": {
+                "type": "string"
+              },
+              "ziele": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "news_schnellpfad": {
+                "type": "boolean",
+                "default": false,
+                "x-punchbuddy-helmut": "fast_news"
+              },
+              "verarbeitung": {
+                "enum": [
+                  "wie_vorgabe",
+                  "lokal",
+                  "helmut"
+                ],
+                "default": "wie_vorgabe"
+              }
+            }
+          },
+          "x-punchbuddy-helmut": "delivery_jobs",
+          "x-ab": "noch ohne Funktion"
+        },
+        "verarbeitung_helmut": {
+          "title": "Verarbeitung durch Helmut",
+          "type": "object",
+          "properties": {
+            "vorgabe": {
+              "enum": [
+                "lokal",
+                "helmut",
+                "je_job"
+              ],
+              "default": "lokal",
+              "x-ab": "noch ohne Funktion"
+            },
+            "stream_auslieferung": {
+              "type": "string",
+              "default": "Ottilie Auslieferung",
+              "x-ab": "noch ohne Funktion"
+            },
+            "stream_vorschau": {
+              "type": "string",
+              "default": "Ottilie Vorschau",
+              "x-ab": "noch ohne Funktion"
+            },
+            "stream_pruefen": {
+              "type": "string",
+              "default": "Ottilie Prüfen",
+              "x-ab": "noch ohne Funktion"
+            },
+            "aufruf": {
+              "enum": [
+                "custom_stream",
+                "ereignis"
+              ],
+              "default": "custom_stream",
+              "x-ab": "noch ohne Funktion"
+            },
+            "ereignis": {
+              "type": "string",
+              "default": "CUSTOM",
+              "x-ab": "noch ohne Funktion"
+            },
+            "endpunkt": {
+              "type": "string",
+              "default": "FX",
+              "x-ab": "noch ohne Funktion"
+            },
+            "uebergabeordner": {
+              "type": "string",
+              "default": "/Volumes/Helmut/Mischung/{projektId}/"
+            },
+            "assets_registrieren": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "jobs_abfragen_s": {
+              "type": "integer",
+              "default": 2,
+              "x-ab": "noch ohne Funktion"
+            },
+            "rueckfall_lokal": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "vorschau": {
+          "title": "Vorschau für Redaktion",
+          "type": "object",
+          "properties": {
+            "bei_jeder_auslieferung": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy-helmut": "preview_after_delivery",
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "aufloesung": {
+              "const": "1920x1080",
+              "default": "1920x1080",
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "format": {
+              "enum": [
+                "h264_mp4",
+                "hevc_mp4"
+              ],
+              "default": "h264_mp4",
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "video_bitrate_mbit": {
+              "enum": [
+                1.5,
+                3,
+                5
+              ],
+              "default": 3,
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "ton": {
+              "enum": [
+                "st_stereo",
+                "st_und_kommentar",
+                "alle_gemischt"
+              ],
+              "default": "st_stereo",
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "vor_export_fragen": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "timecode_einblenden": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "warntext_einblenden": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "warntext": {
+              "type": "string",
+              "default": "Vorschau – nicht senden",
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "warntext_vorschlaege": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "Vorschau – nicht senden",
+                "Rohfassung",
+                "Nur intern",
+                "Sperrfrist beachten"
+              ],
+              "x-ab": "M8 – Vorschau und Teilen"
+            },
+            "teilen": {
+              "type": "object",
+              "properties": {
+                "onedrive_ordner": {
+                  "type": "string",
+                  "default": "/Ottilie/Vorschau",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                },
+                "link_reichweite": {
+                  "enum": [
+                    "organization",
+                    "users",
+                    "anonymous"
+                  ],
+                  "default": "organization",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                },
+                "rechte": {
+                  "enum": [
+                    "view",
+                    "edit"
+                  ],
+                  "default": "view",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                },
+                "ablauf_tage": {
+                  "enum": [
+                    1,
+                    7,
+                    30,
+                    0
+                  ],
+                  "default": 7,
+                  "description": "0 = nie",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                },
+                "teams_ziel": {
+                  "enum": [
+                    "chat_redaktion",
+                    "kanal_sendung"
+                  ],
+                  "default": "chat_redaktion",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                },
+                "email_an": {
+                  "type": "string",
+                  "default": "Redaktion aus dem Helmut-Projekt",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                },
+                "kopie_an": {
+                  "type": "string",
+                  "default": "",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                }
+              }
+            },
+            "lokal_behalten": {
+              "type": "boolean",
+              "default": false,
+              "x-quelle": "lokal",
+              "x-ab": "M8 – Vorschau und Teilen"
+            }
+          }
+        },
+        "notweg_bericht": {
+          "title": "Notweg & Bericht",
+          "type": "object",
+          "properties": {
+            "usb_anbieten": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "usb_nachfragen": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "bericht_schreiben": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy-helmut": "delivery_write_report",
+              "x-ab": "noch ohne Funktion"
+            },
+            "berichtsordner": {
+              "type": "string",
+              "default": "~/Documents/Ottilie/Berichte",
+              "x-quelle": "mdm",
+              "x-ab": "noch ohne Funktion"
+            },
+            "videoid_abfragen": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "videoid_zwischenablage": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "videoid_pflicht": {
+              "type": "boolean",
+              "default": false,
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "export_bildschirm": {
+          "title": "Vorgaben im Export-Bildschirm",
+          "type": "object",
+          "properties": {
+            "benachrichtigen": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "sendefile_als_asset": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "session_schliessen": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "vorschau": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "teilen_wege": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "onedrive",
+                  "teams",
+                  "email"
+                ]
+              },
+              "default": [
+                "onedrive",
+                "teams"
+              ],
+              "x-ab": "noch ohne Funktion"
+            }
+          }
+        },
+        "dateiexporte": {
+          "title": "Datei-Exporte (WAV, AAF)",
+          "type": "object",
+          "x-quelle": "lokal",
+          "description": "Exporte per Befehl export_wav, export_aaf, export_aaf_reference. Leerer Ordner = <Session>/export.",
+          "properties": {
+            "videospur": {
+              "title": "Videospur (Rückfall)",
+              "type": "string",
+              "default": "Video 1",
+              "x-punchbuddy": "video_track",
+              "description": "sonst wird die Videospur automatisch erkannt"
+            },
+            "wav_ordner": {
+              "title": "WAV-Export – Ordner",
+              "type": "string",
+              "default": "",
+              "x-punchbuddy": "wav_export_path"
+            },
+            "aaf_eingebettet_ordner": {
+              "title": "AAF eingebettet – Ordner",
+              "type": "string",
+              "default": "",
+              "x-punchbuddy": "aaf_embedded_export_path"
+            },
+            "aaf_referenz_ordner": {
+              "title": "AAF-Referenz – Ordner",
+              "type": "string",
+              "default": "",
+              "x-punchbuddy": "aaf_reference_export_path"
+            },
+            "aaf_referenz_bittiefe": {
+              "title": "AAF-Referenz – Bittiefe",
+              "enum": [
+                16,
+                24
+              ],
+              "default": 24,
+              "x-punchbuddy": "aaf_reference_bit_depth"
+            },
+            "aaf_referenz_handles_ms": {
+              "title": "AAF-Referenz – Handles (ms)",
+              "type": "integer",
+              "minimum": 0,
+              "default": 1000,
+              "x-punchbuddy": "aaf_reference_handle_ms"
+            }
+          }
+        }
+      }
+    },
+    "system": {
+      "title": "System",
+      "type": "object",
+      "properties": {
+        "raeume_nutzer": {
+          "title": "Räume & Nutzer",
+          "type": "object",
+          "properties": {
+            "raeume": {
+              "x-eigene-ansicht": true,
+              "type": "array",
+              "x-quelle": "helmut",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name",
+                  "rechnername"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "rechnername": {
+                    "type": "string"
+                  },
+                  "id_code": {
+                    "type": "string",
+                    "description": "optionaler Webtrigger-ID-Code des Platzes; kein Zugriffsschutz"
+                  }
+                }
+              }
+            },
+            "ablage": {
+              "title": "Ablage der Nutzer",
+              "enum": [
+                "lokal",
+                "gemeinsamer_ordner"
+              ],
+              "default": "lokal",
+              "x-labels": [
+                "Lokal auf diesem Mac",
+                "Gemeinsamer Ordner"
+              ],
+              "description": "Nutzer, ihre Einstellungen und Templates. Gemeinsamer Ordner (z. B. auf dem Storage): dieselben Nutzer in jedem Raum.",
+              "x-quelle": "lokal"
+            },
+            "gemeinsamer_ordner": {
+              "title": "Gemeinsamer Ordner",
+              "type": "string",
+              "default": "",
+              "description": "Nur bei „Gemeinsamer Ordner“.",
+              "x-ordner": true,
+              "x-quelle": "lokal"
+            },
+            "standard_nutzer": {
+              "title": "Standard-Nutzer dieses Macs",
+              "type": "string",
+              "default": "",
+              "description": "Meldet sich beim Start automatisch an. Leer: beim Start fragen.",
+              "x-nutzerwahl": true,
+              "x-quelle": "lokal"
+            },
+            "raum_erkennung": {
+              "enum": [
+                "rechnername",
+                "fest"
+              ],
+              "default": "rechnername",
+              "x-quelle": "mdm"
+            },
+            "raum_fest": {
+              "type": "string",
+              "x-quelle": "mdm"
+            },
+            "nutzer": {
+              "type": "array",
+              "x-quelle": "helmut",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "mac_benutzer": {
+                    "type": "string"
+                  },
+                  "helmut_benutzer": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "nutzer_modus": {
+              "enum": [
+                "mac_benutzer",
+                "manuell"
+              ],
+              "default": "mac_benutzer",
+              "x-quelle": "mdm"
+            },
+            "raumstatus": {
+              "type": "object",
+              "x-quelle": "helmut",
+              "properties": {
+                "teilen": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "quelle": {
+                  "enum": [
+                    "helmut_mit_rueckfall",
+                    "nur_helmut",
+                    "nur_direkt"
+                  ],
+                  "default": "helmut_mit_rueckfall"
+                },
+                "stufen_prozent": {
+                  "enum": [
+                    10,
+                    25
+                  ],
+                  "default": 10
+                },
+                "intervall_s": {
+                  "type": "integer",
+                  "default": 5
+                }
+              }
+            }
+          }
+        },
+        "schnittstellen": {
+          "title": "Schnittstellen",
+          "type": "object",
+          "x-quelle": "mdm",
+          "properties": {
+            "helmut": {
+              "type": "object",
+              "properties": {
+                "adresse": {
+                  "type": "string",
+                  "format": "uri",
+                  "default": "https://[helmut-server]",
+                  "description": "Server ohne Pfad; die Dienste liegen unter /v1/members, /v1/fx, /v1/co (Helmut4-OpenAPI)"
+                },
+                "anmeldeverfahren": {
+                  "enum": [
+                    "passwort",
+                    "oauth"
+                  ],
+                  "default": "passwort",
+                  "description": "passwort: Benutzername und Kennwort; oauth: OAuth-Schlüssel und -Geheimnis des Kontos (im Schlüsselbund als Konto und Kennwort)"
+                },
+                "anmeldung": {
+                  "enum": [
+                    "service_konto",
+                    "benutzer"
+                  ],
+                  "default": "service_konto",
+                  "x-ab": "noch ohne Funktion"
+                },
+                "schluesselbund_eintrag": {
+                  "type": "string",
+                  "default": "ottilie-helmut"
+                },
+                "abfrageintervall_s": {
+                  "type": "integer",
+                  "default": 5,
+                  "x-ab": "noch ohne Funktion"
+                },
+                "metadaten_set_mischung": {
+                  "type": "string",
+                  "default": "Mischung",
+                  "x-ab": "noch ohne Funktion"
+                },
+                "metadaten_set_auslieferung": {
+                  "type": "string",
+                  "default": "Auslieferung",
+                  "x-ab": "noch ohne Funktion"
+                }
+              }
+            },
+            "energie": {
+              "type": "object",
+              "properties": {
+                "app_nap": {
+                  "enum": [
+                    "immer_aus",
+                    "bei_export_import_aus",
+                    "macos"
+                  ],
+                  "default": "immer_aus",
+                  "x-hinweis": "Die Geräteverwaltung setzt NSAppSleepDisabled",
+                  "x-ab": "noch ohne Funktion"
+                },
+                "ruhezustand_verhindern": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-ab": "noch ohne Funktion"
+                },
+                "hintergrund_niedrige_prioritaet": {
+                  "type": "boolean",
+                  "default": true,
+                  "x-ab": "noch ohne Funktion"
+                }
+              }
+            },
+            "m365": {
+              "type": "object",
+              "properties": {
+                "aktiv": {
+                  "type": "boolean",
+                  "default": false,
+                  "x-ab": "noch ohne Funktion"
+                },
+                "tenant": {
+                  "type": "string",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                },
+                "app_id": {
+                  "type": "string",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                },
+                "senden_als": {
+                  "enum": [
+                    "angemeldeter_nutzer",
+                    "funktionskonto"
+                  ],
+                  "default": "angemeldeter_nutzer",
+                  "x-ab": "M8 – Vorschau und Teilen"
+                }
+              }
+            },
+            "ptsl": {
+              "type": "object",
+              "properties": {
+                "adresse": {
+                  "type": "string",
+                  "default": "localhost:31416"
+                },
+                "client_name": {
+                  "type": "string",
+                  "default": "Ottilie",
+                  "x-ab": "noch ohne Funktion"
+                },
+                "zeitlimit_s": {
+                  "type": "integer",
+                  "default": 30
+                },
+                "mindestversion": {
+                  "type": "string",
+                  "description": "PTSL-/Pro-Tools-Version, die alle Macs haben müssen",
+                  "x-ab": "noch ohne Funktion"
+                }
+              }
+            },
+            "werkzeuge": {
+              "type": "object",
+              "properties": {
+                "bmx": {
+                  "$ref": "#/$defs/werkzeug",
+                  "x-punchbuddy-helmut": "bmxtranswrap_path"
+                },
+                "ffmpeg": {
+                  "$ref": "#/$defs/werkzeug",
+                  "x-punchbuddy-helmut": "ffmpeg_path"
+                },
+                "ffprobe": {
+                  "$ref": "#/$defs/werkzeug",
+                  "x-punchbuddy-helmut": "ffprobe_path"
+                },
+                "mediainfo": {
+                  "$ref": "#/$defs/werkzeug",
+                  "x-punchbuddy-helmut": "mediainfo_path"
+                }
+              }
+            },
+            "arbeitsordner": {
+              "type": "string",
+              "default": "~/Library/Caches/Ottilie/Delivery",
+              "x-punchbuddy-helmut": "remux_scratch_dir",
+              "x-ab": "noch ohne Funktion"
+            },
+            "ramdisk": {
+              "type": "boolean",
+              "default": false,
+              "x-quelle": "lokal",
+              "x-ab": "noch ohne Funktion"
+            },
+            "zwischendateien_loeschen": {
+              "type": "boolean",
+              "default": true,
+              "x-ab": "noch ohne Funktion"
+            },
+            "mcp_aktiv": {
+              "type": "boolean",
+              "default": true
+            },
+            "mcp_nur_lesen": {
+              "type": "boolean",
+              "default": true,
+              "description": "KI-Assistenten (MCP) dürfen nur lesen. Aus: auch Arbeitsabläufe (Holen, Zurückliefern, Havarie, Abbrechen …)"
+            },
+            "mcp_antworten_erlaubt": {
+              "type": "boolean",
+              "default": false,
+              "description": "KI-Assistenten dürfen Fragen eines Auftrags beantworten; sonst nur der Mischer im Fenster"
+            },
+            "mcp_verwalten_erlaubt": {
+              "type": "boolean",
+              "default": false,
+              "description": "KI-Assistenten (MCP) dürfen auch verwalten: Einstellungen, Nutzer, Räume, Templates, Spurprofile, Presets (nur wenn „nur lesen“ aus ist)"
+            }
+          }
+        },
+        "streamdeck_webtrigger": {
+          "title": "Stream Deck & Webtrigger",
+          "type": "object",
+          "x-quelle": "lokal",
+          "properties": {
+            "unix_socket_aktiv": {
+              "type": "boolean",
+              "default": true,
+              "x-punchbuddy": "unix_socket_enabled"
+            },
+            "webtrigger_aktiv": {
+              "type": "boolean",
+              "default": true
+            },
+            "countdown_s": {
+              "type": "integer",
+              "default": 3,
+              "x-ab": "noch ohne Funktion"
+            },
+            "ablehnen_wenn_belegt": {
+              "type": "boolean",
+              "default": true
+            },
+            "port": {
+              "type": "integer",
+              "default": 8899,
+              "x-quelle": "mdm",
+              "x-punchbuddy": "http_port"
+            },
+            "adresse_in_url": {
+              "enum": [
+                "rechnername",
+                "127.0.0.1"
+              ],
+              "default": "rechnername"
+            },
+            "nur_mit_id_code": {
+              "title": "Übers Netzwerk nur mit ID-Code",
+              "description": "Webtrigger von anderen Rechnern lösen nur mit dem ID-Code dieses Platzes aus; ist keiner vergeben, sind sie gesperrt. Aufrufe von diesem Mac (Stream Deck) brauchen keinen Code.",
+              "type": "boolean",
+              "default": false,
+              "x-quelle": "helmut"
+            },
+            "bind_adresse": {
+              "title": "Webtrigger erreichbar",
+              "enum": [
+                "127.0.0.1",
+                "netzwerk"
+              ],
+              "default": "127.0.0.1",
+              "x-punchbuddy": "http_bind_host",
+              "description": "127.0.0.1 = nur dieser Mac; netzwerk = auch aus dem LAN (dann nur mit Token)"
+            },
+            "unix_socket_pfad": {
+              "title": "Stream-Deck-Socket",
+              "type": "string",
+              "default": "/tmp/punchbuddy.sock",
+              "x-punchbuddy": "unix_socket_path",
+              "description": "Zeilenprotokoll für Stream-Deck-Plugin und Launcher; Pfad wie bisher, damit vorhandene Tasten weiterlaufen"
+            },
+            "token_schluesselbund": {
+              "title": "Webtrigger-Token – Schlüsselbund-Eintrag",
+              "type": "string",
+              "default": "ottilie-webtrigger",
+              "x-punchbuddy": "webtrigger_token",
+              "description": "Token liegt nur im Schlüsselbund; leer = ohne Token (nur bei 127.0.0.1)"
+            }
+          }
+        },
+        "vocaster": {
+          "title": "Focusrite Vocaster",
+          "type": "object",
+          "x-quelle": "lokal",
+          "properties": {
+            "phantom_beim_start": {
+              "title": "48 V beim Start einschalten",
+              "type": "boolean",
+              "default": false,
+              "x-punchbuddy": "vocaster_phantom_on_start"
+            },
+            "routing_beim_start": {
+              "title": "Gesichertes Routing beim Start anwenden",
+              "type": "boolean",
+              "default": false,
+              "x-punchbuddy": "vocaster_apply_routing_on_start"
+            }
+          }
+        },
+        "verteilung": {
+          "title": "Verteilung (nur lesen)",
+          "type": "object",
+          "x-quelle": "helmut",
+          "properties": {
+            "mindestversion_app": {
+              "type": "string",
+              "readOnly": true,
+              "x-ab": "Verteilung an die Macs"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "kategorie": {
+      "enum": [
+        "o_ton",
+        "atmo",
+        "musik",
+        "rest"
+      ]
+    },
+    "timecode": {
+      "type": "string",
+      "pattern": "^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]:[0-2][0-9]$"
+    },
+    "spurbereich": {
+      "type": "object",
+      "required": [
+        "von",
+        "bis"
+      ],
+      "properties": {
+        "von": {
+          "type": "string"
+        },
+        "bis": {
+          "type": "string"
+        }
+      }
+    },
+    "template": {
+      "type": "object",
+      "required": [
+        "id",
+        "gruppe",
+        "pt_name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "anzeigename": {
+          "type": "string"
+        },
+        "gruppe": {
+          "type": "string",
+          "description": "Templategruppe wie in Pro Tools unter 'Session Templates' (template_group)"
+        },
+        "pt_name": {
+          "type": "string",
+          "description": "Template-Name in Pro Tools (template_name)"
+        },
+        "sendung": {
+          "type": "string"
+        },
+        "info": {
+          "type": "string",
+          "description": "z. B. Spuranzahl"
+        }
+      }
+    },
+    "werkzeug": {
+      "type": "object",
+      "properties": {
+        "modus": {
+          "enum": [
+            "mitgeliefert",
+            "eigener_pfad"
+          ],
+          "default": "mitgeliefert"
+        },
+        "pfad": {
+          "type": "string"
+        }
+      }
+    },
+    "transfer_ziel": {
+      "type": "object",
+      "required": [
+        "key",
+        "name",
+        "herkunft",
+        "protokoll"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "herkunft": {
+          "enum": [
+            "helmut",
+            "lokal"
+          ],
+          "description": "helmut = nur lesbar; lokal = nur dieser Mac"
+        },
+        "protokoll": {
+          "enum": [
+            "ordner",
+            "sftp",
+            "ftps",
+            "ftp"
+          ],
+          "description": "ordner = eingehängte Freigabe oder Ordner auf diesem Mac; SFTP braucht paramiko (noch nicht freigegeben)"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "benutzer": {
+          "type": "string"
+        },
+        "zielpfad": {
+          "type": "string",
+          "x-punchbuddy-helmut": "remote_path"
+        },
+        "schluesselbund_eintrag": {
+          "type": "string",
+          "x-punchbuddy-helmut": "keychain_service"
+        },
+        "aktiv": {
+          "type": "boolean",
+          "default": true
+        },
+        "atomar": {
+          "type": "boolean",
+          "default": true
+        },
+        "sha256_mitsenden": {
+          "type": "boolean",
+          "default": true,
+          "x-entwicklung": "PunchBuddy schreibt die .sha256 heute nur lokal und sendet sie nicht mit."
+        },
+        "wiederholungen": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3
+        },
+        "fertig_kennzeichen": {
+          "type": "string",
+          "description": "z. B. Umbenennen oder .done-Datei; je Ziel mit der IT zu klären"
+        },
+        "export": {
+          "type": "object",
+          "properties": {
+            "eigene": {
+              "type": "boolean",
+              "default": false
+            },
+            "preset": {
+              "type": "string"
+            },
+            "format": {
+              "enum": [
+                "stereo_je_spur",
+                "mono_je_kanal"
+              ]
+            },
+            "mono_im_mxf": {
+              "type": "boolean"
+            },
+            "spuren": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Reihenfolge = Kanäle; leer = wie Vorgabe"
+            },
+            "dateiname_muster": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "preset": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "mxf_profil"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "modus": {
+          "enum": [
+            "auto",
+            "rewrap",
+            "recode"
+          ],
+          "default": "auto"
+        },
+        "werkzeug": {
+          "enum": [
+            "bmx",
+            "ffmpeg"
+          ],
+          "default": "bmx"
+        },
+        "container": {
+          "type": "string",
+          "default": "MXF OP1a"
+        },
+        "mxf_profil": {
+          "enum": [
+            "ARD_ZDF_HDF01a",
+            "ARD_ZDF_HDF01b",
+            "ARD_ZDF_HDF02a",
+            "ARD_ZDF_HDF02b",
+            "ARD_ZDF_HDF03a",
+            "ARD_ZDF_HDF03b"
+          ]
+        },
+        "video_codec": {
+          "type": "string"
+        },
+        "video_bitrate": {
+          "type": "string"
+        },
+        "afd": {
+          "type": "integer",
+          "default": 8
+        },
+        "threads": {
+          "type": "integer"
+        },
+        "slices": {
+          "type": "integer"
+        },
+        "monospuren": {
+          "type": "boolean",
+          "default": true,
+          "x-punchbuddy-helmut": "audio_split_to_mono"
+        },
+        "startband": {
+          "enum": [
+            "entfernen",
+            "behalten"
+          ],
+          "default": "entfernen"
+        },
+        "sollwerte": {
+          "type": "object",
+          "properties": {
+            "codec": {
+              "type": "string"
+            },
+            "bitrate_mbit": {
+              "type": "number"
+            },
+            "fps": {
+              "type": "number"
+            },
+            "start_tc": {
+              "$ref": "#/$defs/timecode"
+            },
+            "tonspuren": {
+              "type": "integer"
+            }
+          }
+        },
+        "dateiname_muster": {
+          "type": "string",
+          "description": "Platzhalter {sendung} {datum} {titel} {version} {videoid} {projektId}"
+        }
+      }
+    },
+    "profilspur": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Spur",
+          "description": "Name in Pro Tools (beim Lesen übernommen)"
+        },
+        "typ": {
+          "type": "string",
+          "title": "Typ",
+          "description": "PTSL-Spurtyp, z. B. AudioTrack, AuxTrack, BasicFolder, VideoTrack"
+        },
+        "format": {
+          "type": "string",
+          "title": "Format",
+          "description": "TF_Mono, TF_Stereo …"
+        },
+        "ordner": {
+          "type": "string",
+          "title": "Ordner"
+        },
+        "triage": {
+          "enum": [
+            "",
+            "o_ton",
+            "atmo",
+            "musik",
+            "rest"
+          ],
+          "default": "",
+          "title": "Triage-Ziel"
+        },
+        "ausblenden_wenn_leer": {
+          "type": "boolean",
+          "default": false,
+          "title": "Ausblenden, wenn leer"
+        },
+        "exportname": {
+          "type": "string",
+          "default": "",
+          "title": "Exportname",
+          "description": "Name der exportierten Datei (ST, IT, DoE …); leer = Spurname"
+        },
+        "export": {
+          "type": "boolean",
+          "default": false,
+          "title": "Export"
+        },
+        "kanal": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "title": "Kanäle",
+          "description": "Erster Kanal im Sendefile (1 = 1/2, 3 = 3/4 …); 0 = nach der Reihenfolge"
+        },
+        "inhalt": {
+          "type": "string",
+          "default": "",
+          "title": "Inhalt"
+        },
+        "r128": {
+          "type": "boolean",
+          "default": false,
+          "title": "R128"
+        },
+        "rec_a": {
+          "type": "boolean",
+          "default": false,
+          "title": "Record A"
+        },
+        "monitor_a": {
+          "type": "boolean",
+          "default": false,
+          "title": "Abhören A"
+        },
+        "rec_b": {
+          "type": "boolean",
+          "default": false,
+          "title": "Record B"
+        },
+        "monitor_b": {
+          "type": "boolean",
+          "default": false,
+          "title": "Abhören B"
+        },
+        "play_input": {
+          "type": "boolean",
+          "default": false,
+          "title": "Play Input"
+        },
+        "fehlt": {
+          "type": "boolean",
+          "default": false,
+          "title": "Fehlt in der Session",
+          "description": "beim letzten Lesen nicht mehr gefunden"
+        }
+      }
+    },
+    "spurprofil": {
+      "type": "object",
+      "required": [
+        "template_name"
+      ],
+      "properties": {
+        "template_gruppe": {
+          "type": "string",
+          "title": "Templategruppe"
+        },
+        "template_name": {
+          "type": "string",
+          "title": "Template"
+        },
+        "gelesen_aus": {
+          "type": "string",
+          "title": "Gelesen aus Session"
+        },
+        "gelesen_am": {
+          "type": "string",
+          "title": "Gelesen am"
+        },
+        "spuren_mit_clips_einblenden": {
+          "type": "boolean",
+          "default": true
+        },
+        "leere_spuren_ausblenden": {
+          "type": "boolean",
+          "default": true
+        },
+        "wenn_voll": {
+          "enum": [
+            "reservespuren",
+            "verwandte_kategorie",
+            "nachfragen"
+          ],
+          "default": "reservespuren"
+        },
+        "trackdaten_preset": {
+          "type": "string",
+          "default": "",
+          "description": "leer = Einstellung Import › Import-Vorschau"
+        },
+        "spuren": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/profilspur"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Lieferpaket der Bauanleitung (Inhalt ist entpackt im Repo)
+*.zip
+
+# Lokale Claude-Einstellungen
+.claude/settings.local.json
+
+# Keine Zugangsdaten ins Repo
+*.env
+.env*
+secrets/
+
+# Testmaterial (echte Sendungen, große Medien) nie ins Repo
+testfiles/
+*.aaf
+*.mxf
+*.ptx
+*.ptxt
+*.wav
+
+# Paketbau (tools/build_app.sh)
+build/
+dist/

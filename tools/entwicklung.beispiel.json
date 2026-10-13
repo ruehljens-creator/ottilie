@@ -1,0 +1,24 @@
+{
+ "_hinweis": "Vorlage für testfiles/entwicklung.json (lokal, nicht eingecheckt) – siehe tonmischung/devlocal.py. Relative Pfade gelten ab dem Projektordner.",
+ "testordner": "~/Documents/Ottilie-Test",
+ "templates": [
+  "Gruppe/Name eines Test-Templates"
+ ],
+ "beitraege": [
+  {
+   "id": "b1",
+   "titel": "Beispielbeitrag",
+   "sendung": "Heimatjournal",
+   "dateien": [
+    "/Volumes/Testdaten/AAFs/beispiel.aaf"
+   ]
+  }
+ ],
+ "testdateien": {
+  "davinci_aaf": "AAF aus DaVinci Resolve, 50 fps, Ton in Samples",
+  "premiere_aaf": "AAF aus Premiere mit drei fehlenden Audiodateien und gerendertem Video daneben",
+  "premiere_eingebettet_aaf": "AAF aus Premiere mit 16 eingebetteten Audiodateien",
+  "aaf_stromnetze": "Avid-AAF mit Spr 2, A1–A4, Musik1/2",
+  "aaf_trinkwasser": "Avid-AAF ohne Musik, A3/A4 als Paar"
+ }
+}

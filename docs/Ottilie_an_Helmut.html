@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ottilie an Helmut</title>
+<meta name="description" content="Alle Helmut-Aufrufe, Felder und Einstellungen, die Ottilie braucht – mit Beschreibung und offenen Punkten.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: Kopf mit Logo, klebende Sprungleiste, Abschnitte von den Voraussetzungen über die Aufrufe bis zu den offenen Punkten.
+   Farben aus Ottilies Schema „Blau-Grau“: Marine als Tinte, Cerulean als Akzent, Bernstein für Hinweise. */
+:root {
+  --bg: #F3F6F9; --surface: #FFFFFF; --ink: #17263A; --ink-2: #33465C; --muted: #5A6B7E; --line: #D6DFE8;
+  --accent: #1679B3; --accent-ink: #0F5E8E; --accent-soft: #E3F0F8; --label-bg: #EAF0F6; --label-line: #C5D3E0;
+  --warn-bg: #FFF5DF; --warn-line: #E2C27A; --warn-ink: #6A4D12; --ok: #2F7A45; --step: #1679B3;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #151D28; --surface: #1E2836; --ink: #E4EAF1; --ink-2: #C9D3DE; --muted: #A9B8C8; --line: #2F3D50;
+  --accent: #6DB1DA; --accent-ink: #8FD0EE; --accent-soft: #1D3A55; --label-bg: #263446; --label-line: #3E4E62;
+  --warn-bg: #3A3424; --warn-line: #8A6A2E; --warn-ink: #F5DDB0; --ok: #8EE29A; --step: #6DB1DA; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #151D28; --surface: #1E2836; --ink: #E4EAF1; --ink-2: #C9D3DE; --muted: #A9B8C8; --line: #2F3D50;
+  --accent: #6DB1DA; --accent-ink: #8FD0EE; --accent-soft: #1D3A55; --label-bg: #263446; --label-line: #3E4E62;
+  --warn-bg: #3A3424; --warn-line: #8A6A2E; --warn-ink: #F5DDB0; --ok: #8EE29A; --step: #6DB1DA; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+  padding-inline: 16px; padding-block: 0 48px; }
+.wrap { max-width: 980px; margin: 0 auto; }
+a { color: var(--accent-ink); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 42px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: clamp(24px, 3.6vw, 30px); font-weight: 700; }
+h3 { font-size: 19px; font-weight: 600; margin-top: 28px; margin-bottom: 10px; }
+p { margin: 0 0 12px; max-width: 68ch; }
+.muted { color: var(--muted); }
+code, .path { font-family: var(--font-mono); font-size: 0.86em; overflow-wrap: anywhere; }
+.ui { font-family: var(--font-body); font-size: 0.9em; font-weight: 500; white-space: nowrap; padding: 1px 7px;
+  border: 1px solid var(--label-line); background: var(--label-bg); border-radius: 5px; color: var(--ink); }
+.key { font-family: var(--font-mono); font-size: 0.85em; padding: 0 5px; border: 1px solid var(--label-line);
+  border-bottom-width: 2px; border-radius: 4px; background: var(--surface); }
+
+header.top { display: flex; align-items: center; gap: 20px; padding-block: 36px 20px; flex-wrap: wrap; }
+header.top img { width: 84px; height: 84px; flex-shrink: 0; }
+header.top .t { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink); }
+.lead { font-size: 18px; color: var(--ink-2); max-width: 70ch; }
+
+nav.jump { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+nav.jump ul { list-style: none; margin: 0 auto; padding: 10px 0; display: flex; gap: 6px 18px; flex-wrap: wrap; max-width: 980px; }
+nav.jump a { text-decoration: none; font-weight: 600; font-size: 15px; color: var(--ink-2); padding: 4px 0; }
+nav.jump a:hover { color: var(--accent-ink); }
+
+section.part { padding-block: 32px 8px; border-top: 1px solid var(--line); margin-top: 24px; }
+section.part:first-of-type { border-top: 0; }
+.part-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.part-head .who { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+.box > :last-child { margin-bottom: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.grid2 > * { min-width: 0; }
+ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Ablauf: echte Reihenfolge, daher nummeriert */
+ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 14px; }
+ol.steps > li::before { content: counter(s); font-family: var(--font-display); font-weight: 700; font-size: 18px;
+  color: var(--step); width: 34px; height: 34px; border: 2px solid var(--step); border-radius: 50%;
+  display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+ol.steps > li > div { min-width: 0; padding-top: 3px; }
+ol.steps h4 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+ol.steps p { margin-bottom: 6px; }
+
+/* Schrittfolge eines Auftrags, wie sie die Fortschrittsansicht zeigt */
+.chain { display: flex; flex-wrap: wrap; gap: 6px 4px; align-items: center; margin: 6px 0 10px; padding: 0; list-style: none; }
+.chain li { font-size: 13.5px; display: inline-flex; align-items: center; }
+.chain li span { padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); }
+.chain li:not(:last-child)::after { content: "→"; color: var(--muted); margin: 0 2px 0 6px; }
+
+/* Zustände in Helmut */
+.states { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 10px 0 4px; padding: 0; list-style: none; }
+.states li { flex: 1 1 150px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.states .st { font-weight: 600; }
+.states .by { font-size: 13px; color: var(--muted); }
+.states li.side { border-style: dashed; }
+
+dl.cases { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 0; margin: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+dl.cases dt, dl.cases dd { padding: 12px 16px; border-top: 1px solid var(--line); margin: 0; }
+dl.cases dt:first-of-type, dl.cases dt:first-of-type + dd { border-top: 0; }
+dl.cases dt { font-weight: 600; background: var(--label-bg); }
+dl.cases dd p:last-child { margin-bottom: 0; }
+
+.note { border-left: 4px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-ink); padding: 12px 16px;
+  border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 72ch; }
+.note strong { color: var(--warn-ink); }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 6px 0 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+caption { text-align: left; padding: 10px 14px 0; font-weight: 600; color: var(--ink-2); }
+th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-top: 1px solid var(--line); }
+thead th { border-top: 0; font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; font-family: var(--font-mono); font-size: 13.5px; }
+
+footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+
+@media (max-width: 640px) {
+  dl.cases { grid-template-columns: minmax(0, 1fr); }
+  dl.cases dd { border-top: 0; padding-top: 0; }
+  dl.cases dt { background: none; padding-bottom: 4px; }
+  ol.steps > li { grid-template-columns: 34px minmax(0, 1fr); gap: 0 10px; }
+  header.top img { width: 64px; height: 64px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+/* Zusätze für die Schnittstellenseite */
+.m { font-family: var(--font-mono); font-size: 12px; font-weight: 500; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid var(--label-line); background: var(--label-bg); color: var(--ink); white-space: nowrap; }
+.m.get { border-color: var(--accent); color: var(--accent-ink); }
+.m.put { border-color: var(--warn-line); color: var(--warn-ink); background: var(--warn-bg); }
+td code { font-size: 12.5px; }
+td.ep { min-width: 15rem; }
+td.ep code { display: block; margin-top: 4px; }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-ink); white-space: nowrap; }
+.pill.later { background: var(--label-bg); color: var(--muted); }
+ul.check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+ul.check li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
+ul.check li::before { content: ""; width: 16px; height: 16px; margin-top: 4px; border: 2px solid var(--accent); border-radius: 4px; }
+pre { font-family: var(--font-mono); font-size: 12.5px; background: var(--label-bg); border: 1px solid var(--label-line);
+  border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin: 6px 0 10px; }
+
+/* Pfeildiagramm: Farben nur aus den Tokens, damit es in hell und dunkel lesbar bleibt */
+figure.flowfig { margin: 18px 0 8px; }
+.flowwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 8px; }
+svg.flow { display: block; font-family: var(--font-body); }
+svg.flow .band { fill: var(--label-bg); }
+svg.flow .phase { fill: var(--ink); font-family: var(--font-display); font-weight: 600; font-size: 14px; }
+svg.flow .life { stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 3 4; }
+svg.flow .head { fill: var(--surface); stroke: var(--label-line); stroke-width: 1.5; }
+svg.flow .head.main { fill: var(--accent-soft); stroke: var(--accent); }
+svg.flow .hname { fill: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+svg.flow .hsub { fill: var(--muted); font-size: 11.5px; }
+svg.flow .ep { fill: var(--ink); font-family: var(--font-mono); font-size: 11.5px; }
+svg.flow .nt { fill: var(--ink-2); font-size: 12px; }
+svg.flow .ar { stroke-width: 1.8; fill: none; }
+svg.flow .ar-call { stroke: var(--accent); }
+svg.flow .ar-reply { stroke: var(--accent); stroke-dasharray: 6 4; }
+svg.flow .ar-ptsl { stroke: var(--ink-2); }
+svg.flow .ar-file, svg.flow .ar-helmut { stroke: var(--warn-ink); }
+svg.flow .ar-helmut { stroke-dasharray: 6 4; }
+svg.flow .ah-call, svg.flow .ah-reply { fill: var(--accent); }
+svg.flow .ah-ptsl { fill: var(--ink-2); }
+svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; padding: 0; margin: 10px 0 0; font-size: 13.5px; color: var(--ink-2); }
+.legend li { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { display: inline-block; width: 28px; height: 0; border-top: 2px solid var(--accent); }
+.legend i.reply { border-top-style: dashed; }
+.legend i.ptsl { border-top-color: var(--ink-2); }
+.legend i.file { border-top-color: var(--warn-ink); }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <img src="data:image/png;base64,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" alt="Ottilie-Logo: Seehund mit Kopfhörer">
+  <div class="t">
+    <span class="eyebrow">Ottilie · Schnittstelle zu Helmut</span>
+    <h1>Ottilie an Helmut</h1>
+    <p class="lead">Was Helmut für Ottilie bereitstellen muss, welche Aufrufe Ottilie macht, welche Funktion sie auslöst und was am echten System noch zu klären ist. Stand 09.10.2026, gegen den Helmut-Mock getestet, noch nicht gegen die Instanz des Hauses.</p>
+  </div>
+</header>
+</div>
+
+<nav class="jump" aria-label="Abschnitte">
+  <ul>
+    <li><a href="#voraussetzungen">Voraussetzungen</a></li>
+    <li><a href="#ablauf">Ablauf</a></li>
+    <li><a href="#aufrufe">Aufrufe</a></li>
+    <li><a href="#funktionen">Funktionen</a></li>
+    <li><a href="#set">Set „Mischung“</a></li>
+    <li><a href="#zustaende">Zustände</a></li>
+    <li><a href="#ausfall">Ausfall</a></li>
+    <li><a href="#einstellungen">Einstellungen</a></li>
+    <li><a href="#offen">Zu klären</a></li>
+  </ul>
+</nav>
+
+<div class="wrap">
+<section class="part" id="voraussetzungen" aria-labelledby="h-vor">
+  <div class="part-head"><span class="who">Für MoovIT und die Helmut-Administration</span><h2 id="h-vor">Voraussetzungen in Helmut</h2></div>
+  <div class="grid2">
+    <div class="box">
+      <h3 style="margin-top:0">Einrichten</h3>
+      <ul class="check">
+        <li><span><strong>Service-Konto</strong> für Ottilie, mit Benutzername und Kennwort oder OAuth-Schlüssel und -Geheimnis. Es liegt auf jedem Mac im Schlüsselbund unter <code>ottilie-helmut</code>, nie in Dateien.</span></li>
+        <li><span><strong>Rechte des Kontos:</strong> FX-Projekte suchen und lesen, Metadaten schreiben, Projektstatus setzen, Projekte duplizieren, Assets lesen und anlegen, Benachrichtigungen an Nutzer senden.</span></li>
+        <li><span><strong>Metadaten-Set „Mischung“</strong> am FX-Projekt mit den <a href="#set">17 Feldern</a> unten, alle als Text.</span></li>
+        <li><span><strong>Projektstatus</strong> <code>LOCKED</code> und <code>UNLOCKED</code> setzbar.</span></li>
+      </ul>
+    </div>
+    <div class="box">
+      <h3 style="margin-top:0">Übergabe und Ablage</h3>
+      <ul class="check">
+        <li><span><strong>Übergabe als Assets am Projekt:</strong> AAF (<code>.aaf</code>), Referenzvideo (<code>.mxf</code>, <code>.mov</code>, <code>.mp4</code>), wahlweise ein Manifest (Name beginnt mit „manifest“). Gilt je das neueste.</span></li>
+        <li><span><strong>Gleiche Pfade:</strong> Den <code>filepath</code> eines Assets öffnet Ottilie unverändert auf dem Mac. Helmut-Speicher müssen dort unter demselben Pfad eingebunden sein, z. B. <code>/Volumes/Helmut/…</code>.</span></li>
+        <li><span><strong>Übergabeordner für die WAVs</strong>, vom Mac beschreibbar und für Helmut lesbar. Vorgabe: <code>/Volumes/Helmut/Mischung/{projektId}/</code>.</span></li>
+        <li><span><strong>Sendung</strong> = Projektgruppe (<code>group</code>).</span></li>
+        <li><span><strong>Helmut-Benutzernamen</strong> von Mischern und Cuttern in Ottilie unter „Räume &amp; Nutzer“, damit Benachrichtigungen ankommen.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="ablauf" aria-labelledby="h-abl">
+  <div class="part-head"><span class="who">Wer ruft wen, in welcher Reihenfolge</span><h2 id="h-abl">Ablauf im Bild</h2></div>
+  <p>Die Pfeile zeigen einen Beitrag auf dem Weg durch Ottilie: oben anmelden und Liste laden, dann holen, mischen und zurückliefern – oder freigeben. Ottilie ist die einzige Stelle, die Helmut und Pro Tools anspricht; Helmut ruft Ottilie bisher nicht auf.</p>
+
+<figure class="flowfig" aria-labelledby="flow-cap">
+  <div class="flowwrap">
+<svg class="flow" viewBox="0 0 960 1166" width="960" height="1166" role="img" aria-labelledby="flow-t flow-d" xmlns="http://www.w3.org/2000/svg">
+<title id="flow-t">Ablauf zwischen Pro Tools, Ottilie, Helmut und Helmut-Speicher</title>
+<desc id="flow-d">Pfeile von oben nach unten: Anmelden, Liste laden, Holen mit Sperren und Übernehmen, Import in Pro Tools, Raumstatus beim Mischen, Zurückliefern mit WAVs, Assets, Zustand ausgeliefert und Entsperren, oder Freigeben mit Nachricht.</desc>
+<defs>
+<marker id="ah-call" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah ah-call" d="M0 0 L10 5 L0 10 z"/></marker>
+<marker id="ah-reply" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah ah-reply" d="M0 0 L10 5 L0 10 z"/></marker>
+<marker id="ah-ptsl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah ah-ptsl" d="M0 0 L10 5 L0 10 z"/></marker>
+<marker id="ah-file" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah ah-file" d="M0 0 L10 5 L0 10 z"/></marker>
+<marker id="ah-helmut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah ah-helmut" d="M0 0 L10 5 L0 10 z"/></marker>
+</defs>
+<line class="life" x1="100" y1="64" x2="100" y2="1158"/>
+<line class="life" x1="340" y1="64" x2="340" y2="1158"/>
+<line class="life" x1="660" y1="64" x2="660" y2="1158"/>
+<line class="life" x1="865" y1="64" x2="865" y2="1158"/>
+<rect class="band" x="0" y="84" width="960" height="22" rx="4"/>
+<text class="phase" x="12" y="99.0">Anmelden</text>
+<rect class="band" x="0" y="196" width="960" height="22" rx="4"/>
+<text class="phase" x="12" y="211.0">Liste „Zur Mischung“, alle 15 s</text>
+<rect class="band" x="0" y="308" width="960" height="22" rx="4"/>
+<text class="phase" x="12" y="323.0">Holen</text>
+<rect class="band" x="0" y="660" width="960" height="22" rx="4"/>
+<text class="phase" x="12" y="675.0">Mischen</text>
+<rect class="band" x="0" y="732" width="960" height="22" rx="4"/>
+<text class="phase" x="12" y="747.0">Zurückliefern</text>
+<rect class="band" x="0" y="1004" width="960" height="22" rx="4"/>
+<text class="phase" x="12" y="1019.0">Statt Zurückliefern: Freigeben</text>
+<rect class="head" x="20.0" y="8" width="160" height="52" rx="8"/>
+<text class="hname" x="100" y="31" text-anchor="middle">Pro Tools</text>
+<text class="hsub" x="100" y="49" text-anchor="middle">PTSL, lokal</text>
+<rect class="head main" x="260.0" y="8" width="160" height="52" rx="8"/>
+<text class="hname" x="340" y="31" text-anchor="middle">Ottilie</text>
+<text class="hsub" x="340" y="49" text-anchor="middle">Mac im Mischraum</text>
+<rect class="head" x="580.0" y="8" width="160" height="52" rx="8"/>
+<text class="hname" x="660" y="31" text-anchor="middle">Helmut</text>
+<text class="hsub" x="660" y="49" text-anchor="middle">Server, REST /v1</text>
+<rect class="head" x="785.0" y="8" width="160" height="52" rx="8"/>
+<text class="hname" x="865" y="31" text-anchor="middle">Helmut-Speicher</text>
+<text class="hsub" x="865" y="49" text-anchor="middle">/Volumes/Helmut</text>
+<line class="ar ar-call" x1="344" y1="136" x2="654" y2="136" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="118" text-anchor="start">POST /v1/members/auth/login/body</text>
+<text class="nt" x="350" y="131" text-anchor="start">Service-Konto aus dem Schlüsselbund</text>
+<line class="ar ar-reply" x1="656" y1="176" x2="346" y2="176" marker-end="url(#ah-reply)"/>
+<text class="nt" x="650" y="170" text-anchor="end">Token (Bearer)</text>
+<line class="ar ar-call" x1="344" y1="248" x2="654" y2="248" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="230" text-anchor="start">POST /v1/fx/projects/search</text>
+<text class="nt" x="350" y="243" text-anchor="start">alle FX-Projekte, neueste zuerst</text>
+<line class="ar ar-reply" x1="656" y1="288" x2="346" y2="288" marker-end="url(#ah-reply)"/>
+<text class="nt" x="650" y="282" text-anchor="end">Projekte mit Set „Mischung“ und Sperre</text>
+<line class="ar ar-call" x1="344" y1="360" x2="654" y2="360" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="342" text-anchor="start">GET /v1/fx/projects/{id}</text>
+<text class="nt" x="350" y="355" text-anchor="start">frisch lesen: frei und nicht gesperrt?</text>
+<line class="ar ar-call" x1="344" y1="400" x2="654" y2="400" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="382" text-anchor="start">PUT /v1/fx/projects/status/{id}</text>
+<text class="nt" x="350" y="395" text-anchor="start">LOCKED</text>
+<line class="ar ar-call" x1="344" y1="440" x2="654" y2="440" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="422" text-anchor="start">PUT /v1/fx/projects/metadata/{id}</text>
+<text class="nt" x="350" y="435" text-anchor="start">zustand = uebernommen, mischer, raum</text>
+<line class="ar ar-call" x1="344" y1="480" x2="654" y2="480" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="462" text-anchor="start">GET /v1/co/assets/{id}</text>
+<text class="nt" x="350" y="475" text-anchor="start">Übergabe suchen</text>
+<line class="ar ar-reply" x1="656" y1="520" x2="346" y2="520" marker-end="url(#ah-reply)"/>
+<text class="nt" x="650" y="514" text-anchor="end">Pfade von AAF, Video, Manifest</text>
+<line class="ar ar-file" x1="344" y1="560" x2="859" y2="560" marker-end="url(#ah-file)"/>
+<text class="nt" x="350" y="554" text-anchor="start">AAF und Video lesen (gleicher Pfad)</text>
+<line class="ar ar-ptsl" x1="336" y1="600" x2="106" y2="600" marker-end="url(#ah-ptsl)"/>
+<text class="ep" x="330" y="582" text-anchor="end">PTSL</text>
+<text class="nt" x="330" y="595" text-anchor="end">Session aus Template, AAF-Import</text>
+<line class="ar ar-call" x1="344" y1="640" x2="654" y2="640" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="622" text-anchor="start">PUT /v1/fx/projects/metadata/{id}</text>
+<text class="nt" x="350" y="635" text-anchor="start">zustand = importiert, session_pfad</text>
+<line class="ar ar-call" x1="344" y1="712" x2="654" y2="712" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="694" text-anchor="start">PUT /v1/fx/projects/metadata/{id}</text>
+<text class="nt" x="350" y="707" text-anchor="start">Raumstatus: fortschritt, taetigkeit</text>
+<line class="ar ar-ptsl" x1="336" y1="784" x2="106" y2="784" marker-end="url(#ah-ptsl)"/>
+<text class="ep" x="330" y="766" text-anchor="end">PTSL</text>
+<text class="nt" x="330" y="779" text-anchor="end">konsolidieren, R 128, WAVs</text>
+<line class="ar ar-file" x1="344" y1="824" x2="859" y2="824" marker-end="url(#ah-file)"/>
+<text class="nt" x="350" y="818" text-anchor="start">WAVs nach Mischung/{projektId}/&lt;Zeit&gt;/</text>
+<line class="ar ar-call" x1="344" y1="864" x2="654" y2="864" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="846" text-anchor="start">POST /v1/co/assets</text>
+<text class="nt" x="350" y="859" text-anchor="start">je WAV ein Asset (AUDIO, art = tonspur)</text>
+<line class="ar ar-call" x1="344" y1="904" x2="654" y2="904" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="886" text-anchor="start">PUT /v1/fx/projects/metadata/{id}</text>
+<text class="nt" x="350" y="899" text-anchor="start">zustand = ausgeliefert, fortschritt = 100</text>
+<line class="ar ar-call" x1="344" y1="944" x2="654" y2="944" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="926" text-anchor="start">PUT /v1/fx/projects/status/{id}</text>
+<text class="nt" x="350" y="939" text-anchor="start">UNLOCKED – Beitrag ist frei</text>
+<line class="ar ar-helmut" x1="664" y1="984" x2="859" y2="984" marker-end="url(#ah-helmut)"/>
+<text class="nt" x="670" y="978" text-anchor="start">Helmut liest die WAVs</text>
+<line class="ar ar-call" x1="344" y1="1056" x2="654" y2="1056" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="1038" text-anchor="start">PUT /v1/fx/projects/metadata/{id}</text>
+<text class="nt" x="350" y="1051" text-anchor="start">zustand = zurueckgegeben, Grund</text>
+<line class="ar ar-call" x1="344" y1="1096" x2="654" y2="1096" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="1078" text-anchor="start">PUT /v1/fx/projects/status/{id}</text>
+<text class="nt" x="350" y="1091" text-anchor="start">UNLOCKED</text>
+<line class="ar ar-call" x1="344" y1="1136" x2="654" y2="1136" marker-end="url(#ah-call)"/>
+<text class="ep" x="350" y="1118" text-anchor="start">POST /v1/members/users/notification/{user}</text>
+<text class="nt" x="350" y="1131" text-anchor="start">Nachricht an Mischer und Cutter</text>
+</svg>
+  </div>
+  <figcaption id="flow-cap" class="muted" style="margin-top:8px">Ein Beitrag von der Liste bis zur Rückgabe, von oben nach unten. Breiter als ein Telefon: seitlich schieben.</figcaption>
+  <ul class="legend" aria-label="Legende">
+    <li><i></i>Aufruf an Helmut</li>
+    <li><i class="reply"></i>Antwort von Helmut</li>
+    <li><i class="ptsl"></i>Pro Tools über PTSL</li>
+    <li><i class="file"></i>Dateien auf dem Helmut-Speicher</li>
+  </ul>
+</figure>
+
+</section>
+
+<section class="part" id="aufrufe" aria-labelledby="h-auf">
+  <div class="part-head"><span class="who">REST, Helmut4-OpenAPI</span><h2 id="h-auf">Die Aufrufe</h2></div>
+  <p>Ottilie nutzt zehn Endpunkte. Die Adresse ist der Server ohne Pfad; die Dienste liegen unter <code>/v1/members</code>, <code>/v1/fx</code> und <code>/v1/co</code>. Jede Anfrage trägt <code>Authorization: Bearer &lt;Token&gt;</code>.</p>
+  <div class="tablewrap">
+  <table>
+    <caption>Endpunkte, die Ottilie aufruft</caption>
+    <thead><tr><th>Aufruf</th><th>Wofür</th><th>Inhalt und Antwort</th></tr></thead>
+    <tbody>
+      <tr><td class="ep"><span class="m">POST</span><code>/v1/members/auth/login/body?responseWithToken=true</code></td>
+        <td>Anmelden mit Benutzername und Kennwort.</td>
+        <td><code>{"username", "password"}</code> → Token im Header <code>Authorization</code> oder als <code>token</code> im Inhalt.</td></tr>
+      <tr><td class="ep"><span class="m">POST</span><code>/v1/members/auth/oauth?responseWithToken=true</code></td>
+        <td>Anmelden mit OAuth (Einstellung „oauth“).</td>
+        <td>Formular: <code>client_id</code>, <code>client_secret</code>, <code>grant_type=authorization</code>, <code>scope=platform</code> → Token wie oben.</td></tr>
+      <tr><td class="ep"><span class="m">POST</span><code>/v1/fx/projects/search?limit=500&amp;page=0</code></td>
+        <td>Liste „Zur Mischung“, Raumstatus, Prüfung „gehört die offene Session zu einem ausgelieferten Beitrag?“.</td>
+        <td><code>{"type": "FX", "any": false, "filter": [], "sortParameter": {"key": "modifyDate", "direction": "DESC"}}</code> → Liste der Projekte.</td></tr>
+      <tr><td class="ep"><span class="m get">GET</span><code>/v1/fx/projects/{id}</code></td>
+        <td>Ein Beitrag. Vor jedem Schreiben liest Ottilie frisch und prüft, ob er noch ihr gehört.</td>
+        <td>Projekt mit <code>name</code>, <code>group</code>, <code>status</code>, <code>metadata</code>.</td></tr>
+      <tr><td class="ep"><span class="m get">GET</span><code>/v1/co/assets/{projectId}</code></td>
+        <td>Übergabe finden (AAF, Video, Manifest); beim Nachtragen prüfen, ob ein Asset schon da ist.</td>
+        <td>Liste der Assets mit <code>filepath</code>, <code>name</code>, <code>lastModified</code>.</td></tr>
+      <tr><td class="ep"><span class="m put">PUT</span><code>/v1/fx/projects/metadata/{id}</code></td>
+        <td>Set „Mischung“ schreiben: Zustand, Mischer, Raum, Fortschritt, Session …</td>
+        <td><code>{"metadata": […]}</code> – immer die ganze Liste; fremde Einträge bleiben unverändert, im Set ändert sich nur <code>value</code>, fehlende Felder kommen dazu.</td></tr>
+      <tr><td class="ep"><span class="m put">PUT</span><code>/v1/fx/projects/status/{id}</code></td>
+        <td>Sperren beim Übernehmen; entsperren beim Freigeben, nach dem Zurückliefern und am Duplikat.</td>
+        <td><code>{"status": "LOCKED"}</code> bzw. <code>{"status": "UNLOCKED"}</code>.</td></tr>
+      <tr><td class="ep"><span class="m">POST</span><code>/v1/co/assets?createBinStructure=true</code></td>
+        <td>Zurückgelieferte WAVs anmelden; am Duplikat die Übergabe-Dateien des Originals.</td>
+        <td><code>{"projectId", "filepath", "mimeType": "AUDIO", "customMetadata": [{"key": "art", "value": "tonspur"}]}</code>; Übergabe: <code>DATA</code> bzw. <code>VIDEO</code>, <code>art = uebergabe</code>.</td></tr>
+      <tr><td class="ep"><span class="m">POST</span><code>/v1/fx/projects/duplicate</code></td>
+        <td>Duplikat (Zweitfassung, Kurzfassung, Web, Ersatz).</td>
+        <td>Projekt des Originals mit neuem <code>name</code> → neues Projekt mit neuer <code>id</code>.</td></tr>
+      <tr><td class="ep"><span class="m">POST</span><code>/v1/members/users/notification/{userName}</code></td>
+        <td>Nachricht an bisherigen Mischer und Cutter beim Freigeben.</td>
+        <td><code>{"msg": "Titel: Text", "expandDialog": false}</code>.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <h3>Zeitlimits und Wiederholen</h3>
+  <dl class="cases">
+    <dt>Zeitlimit</dt><dd><p>15 s je Anfrage; die Anzeige „Helmut verbunden“ prüft mit 3 s und höchstens alle 30 s neu.</p></dd>
+    <dt>Wiederholen</dt><dd><p>Lesen, <code>PUT</code>, Suche und Anmeldung bis zu zweimal (nach 1 s und 2 s). Anlegende Aufrufe (Asset, Duplikat, Nachricht) nur, wenn die Verbindung gar nicht zustande kam – sonst entstünden Doppelte.</p></dd>
+    <dt>Token abgelaufen</dt><dd><p>Bei <code>401</code> meldet sich Ottilie einmal neu an und wiederholt die Anfrage.</p></dd>
+    <dt>Serverfehler</dt><dd><p><code>500</code>/<code>501</code> gelten als Fehler mit Meldung, nicht als „Helmut nicht erreichbar“. Nur echte Ausfälle gehen in die <a href="#ausfall">Nachtrag-Warteschlange</a>.</p></dd>
+  </dl>
+</section>
+
+<section class="part" id="funktionen" aria-labelledby="h-fun">
+  <div class="part-head"><span class="who">Was eine Funktion in Helmut auslöst</span><h2 id="h-fun">Funktionen und Befehle</h2></div>
+  <p>Links steht die Funktion, wie sie im Fenster heißt, darunter der Befehl der Ottilie-Schnittstelle (<code>docs/API.md</code>, auch für Stream Deck, MCP und Kommandozeile). Alles, was in Helmut schreibt, prüft vorher frisch, ob der Beitrag noch diesem Mischer in diesem Raum gehört; sonst wird nichts überschrieben.</p>
+  <div class="tablewrap">
+  <table>
+    <caption>Funktionen in Ottilie und ihre Helmut-Aufrufe</caption>
+    <thead><tr><th>Funktion · Befehl</th><th>Was in Helmut passiert</th><th>Aufrufe</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Titelleiste</strong><br><code>status</code></td>
+        <td>„Helmut verbunden“ oder Fehlermeldung; Zahl offener Nachträge und Konflikte.</td>
+        <td>Anmeldung, wenn seit 30 s keine Antwort kam</td></tr>
+      <tr><td><strong>Zur Mischung</strong><br><code>beitraege</code>, <code>beitrag</code></td>
+        <td>Nur lesen. Titel (<code>name</code>), Sendung (<code>group</code>), Sperre, Set „Mischung“; wenn vorhanden auch Sendetermin, Länge, Cutter, „dringend“ und Übergabezeit. Neu geladen alle 15 s, solange die Liste zu sehen ist.</td>
+        <td><span class="m">POST</span> Suche, <span class="m get">GET</span> Projekt, <span class="m get">GET</span> Assets</td></tr>
+      <tr><td><strong>Übernehmen</strong> (Teil von Holen)</td>
+        <td>Prüfen (frei, nicht gesperrt), sperren, erneut lesen, Set: <code>uebernommen</code>, Mischer, Raum, Fortschritt 0, Zeit. Scheitert das Schreiben, nimmt Ottilie die eigene Sperre zurück.</td>
+        <td><span class="m get">GET</span>, <span class="m put">PUT</span> Status, <span class="m get">GET</span>, <span class="m put">PUT</span> Metadaten</td></tr>
+      <tr><td><strong>Holen</strong><br><code>holen</code></td>
+        <td>Übernehmen, Übergabe (AAF, Video) aus den Assets, Session aus Template, Import. Danach Set: <code>importiert</code>, Session-Pfad, Ablage, Spiegelordner, Template.</td>
+        <td>wie Übernehmen, <span class="m get">GET</span> Assets, <span class="m put">PUT</span> Metadaten</td></tr>
+      <tr><td><strong>In offene Session holen</strong><br><code>holen_offen</code></td>
+        <td>Wie Holen, aber in die offene Session. Der bisherige Beitrag wird nach Wahl freigegeben, bekommt „weitergeführt in“ oder bleibt in Mischung.</td>
+        <td>wie Holen; bisheriger Beitrag: <span class="m put">PUT</span> Metadaten bzw. Freigeben</td></tr>
+      <tr><td><strong>Stand öffnen</strong><br><code>wiederoeffnen</code>, <code>sicherung_oeffnen</code></td>
+        <td>Gespeicherten Stand oder eine Sicherung als Kopie öffnen; gehört der Beitrag niemandem, übernimmt Ottilie ihn. Set: <code>importiert</code> und neuer Session-Pfad.</td>
+        <td><span class="m get">GET</span>, ggf. Übernehmen, <span class="m put">PUT</span> Metadaten</td></tr>
+      <tr><td><strong>Raumstatus</strong> (Takt alle 5 s)<br><code>raeume</code></td>
+        <td>Während eines Auftrags Fortschritt in 10-%-Stufen und Tätigkeit <code>import</code>/<code>export</code>, nur bei Änderung; am Ende Tätigkeit leer. Die Raumansicht liest die Beiträge, die einen Raum belegen.</td>
+        <td><span class="m get">GET</span>, <span class="m put">PUT</span> Metadaten, <span class="m">POST</span> Suche</td></tr>
+      <tr><td><strong>Zurückliefern</strong><br><code>zurueckliefern</code></td>
+        <td>WAVs (24 bit / 48 kHz, R 128) in <code>Übergabeordner/&lt;Zeitstempel&gt;/</code> kopieren, je WAV ein Asset. Dann Set: <code>ausgeliefert</code>, Fortschritt 100, Tätigkeit leer; danach entsperren. Erneut zurückliefern geht, solange niemand anders übernommen hat.</td>
+        <td><span class="m get">GET</span>, <span class="m">POST</span> Asset je WAV, <span class="m put">PUT</span> Metadaten, <span class="m put">PUT</span> Status</td></tr>
+      <tr><td><strong>Freigeben</strong><br><code>freigeben</code></td>
+        <td>Set: <code>zurueckgegeben</code>, Grund, Zeit, Raum, Wahl fürs nächste Öffnen (letzter Stand oder neu importieren); entsperren; Nachricht an bisherigen Mischer und Cutter.</td>
+        <td><span class="m get">GET</span>, <span class="m put">PUT</span> Metadaten, <span class="m put">PUT</span> Status, <span class="m">POST</span> Nachricht</td></tr>
+      <tr><td><strong>Duplizieren</strong><br><code>duplizieren</code></td>
+        <td>Neues Projekt; Set neu: <code>bereit</code>, „Duplikat von“, auf Wunsch der Mischstand des Originals. Entsperren, fehlende Übergabe-Dateien anmelden (dieselben Dateien, keine Kopie), auf Wunsch gleich übernehmen.</td>
+        <td><span class="m get">GET</span>, <span class="m get">GET</span> Assets, <span class="m">POST</span> Duplikat, <span class="m put">PUT</span> Metadaten, <span class="m put">PUT</span> Status, <span class="m">POST</span> Asset</td></tr>
+      <tr><td><strong>Havarie</strong><br><code>havarie_holen</code>, <code>havarie_ausliefern</code></td>
+        <td>Kein Aufruf. Übernehmen, <code>importiert</code>, <code>ausgeliefert</code> und Entsperren werden mit einer Havarie-Kennung vorgemerkt; das Sendefile bleibt lokal.</td>
+        <td>–</td></tr>
+      <tr><td><strong>Havarie zuordnen</strong><br><code>havarie_zuordnen</code></td>
+        <td>Die vorgemerkten Einträge bekommen die Projekt-ID und werden nachgetragen.</td>
+        <td>wie Nachtragen</td></tr>
+      <tr><td><strong>Nachtragen</strong><br><code>nachtragen</code>, <code>nachtrag_verwerfen</code></td>
+        <td>Liegengebliebene Änderungen schreiben, alle 60 s und auf Knopfdruck. Verwerfen lässt Helmut, wie es ist.</td>
+        <td>je Eintrag wie oben</td></tr>
+      <tr><td><strong>Vor dem Holen</strong> (Session-Regel)</td>
+        <td>Gehört die offene Session zu einem ausgelieferten Beitrag, wird sie ohne Rückfrage gespeichert und geschlossen; sonst fragt Ottilie.</td>
+        <td><span class="m">POST</span> Suche</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <h3>Kommandozeile</h3>
+  <p>Dieselben Abläufe ohne Fenster, z. B. für Tests am Studioplatz:</p>
+<pre>python3 -m tonmischung helmut liste
+python3 -m tonmischung helmut uebernehmen &lt;Projekt-ID&gt;
+python3 -m tonmischung helmut freigeben &lt;Projekt-ID&gt; --grund "Raumwechsel" --naechstes letzter_stand
+python3 -m tonmischung holen &lt;Projekt-ID&gt;
+python3 -m tonmischung zurueckliefern &lt;Projekt-ID&gt;
+python3 -m tonmischung nachtragen --nur-zeigen
+python3 -m tonmischung app --mock</pre>
+  <p class="muted"><code>holen</code> und <code>zurueckliefern</code> steuern Pro Tools und laufen nur, wenn das Ottilie-Fenster nicht läuft. <code>app --mock</code> startet Ottilie mit dem eingebauten Helmut-Mock statt eines Servers.</p>
+</section>
+
+<section class="part" id="set" aria-labelledby="h-set">
+  <div class="part-head"><span class="who">Metadaten am FX-Projekt</span><h2 id="h-set">Set „Mischung“</h2></div>
+  <p>Helmut kennt am Projekt nur gesperrt oder entsperrt. Alles Weitere steht in diesem Set. Ottilie erkennt die Felder am Namen (ersatzweise an <code>customId</code>) und schreibt alle als Text (<code>STRING</code>). Fehlt ein Feld, legt Ottilie es beim Schreiben an. Ein leeres Set gilt als „bereit“.</p>
+  <div class="tablewrap">
+  <table>
+    <caption>17 Felder</caption>
+    <thead><tr><th>Feld</th><th>Inhalt</th><th>Werte, Beispiel</th></tr></thead>
+    <tbody>
+      <tr><td><code>zustand</code></td><td>Zustand der Mischung</td><td><code>bereit</code>, <code>uebernommen</code>, <code>importiert</code>, <code>in_mischung</code>, <code>exportiert</code>, <code>ausgeliefert</code>, <code>zurueckgegeben</code></td></tr>
+      <tr><td><code>mischer</code></td><td>Name des Mischers</td><td>Jens</td></tr>
+      <tr><td><code>raum</code></td><td>Mischraum</td><td>Ton 3</td></tr>
+      <tr><td><code>fortschritt</code></td><td>Fortschritt des laufenden Auftrags</td><td>0–100, in 10er-Stufen</td></tr>
+      <tr><td><code>taetigkeit</code></td><td>Was der Raum gerade tut</td><td><code>import</code>, <code>export</code> oder leer</td></tr>
+      <tr><td><code>session_pfad</code></td><td>Pfad der Pro-Tools-Session</td><td><code>/Volumes/…/Bahnstreik/Bahnstreik.ptx</code></td></tr>
+      <tr><td><code>session_ablage</code></td><td>Wo die Session liegt</td><td><code>helmut_storage</code>, <code>lokal</code>, <code>lokal_spiegelung</code></td></tr>
+      <tr><td><code>session_spiegel</code></td><td>Spiegelordner bei lokaler Ablage</td><td>Pfad oder leer</td></tr>
+      <tr><td><code>template</code></td><td>Template, aus dem die Session entstand</td><td><code>test/helmut test neues startband</code> (Gruppe/Name)</td></tr>
+      <tr><td><code>uebernommen_um</code></td><td>Zeit der Übernahme</td><td>ISO 8601, UTC</td></tr>
+      <tr><td><code>rueckgabe_grund</code></td><td>Grund beim Freigeben</td><td>Workstation abgestürzt, Raumwechsel, Versehentlich übernommen</td></tr>
+      <tr><td><code>rueckgabe_um</code></td><td>Zeit der Freigabe</td><td>ISO 8601, UTC</td></tr>
+      <tr><td><code>rueckgabe_von_raum</code></td><td>Raum, aus dem freigegeben wurde</td><td>Ton 2</td></tr>
+      <tr><td><code>rueckgabe_naechstes_oeffnen</code></td><td>Was beim nächsten Übernehmen geschieht</td><td><code>letzter_stand</code>, <code>neu_importieren</code></td></tr>
+      <tr><td><code>weitergefuehrt_in</code></td><td>Beitrag, in dessen Session weitergearbeitet wurde</td><td>„Titel (Projekt-ID)“</td></tr>
+      <tr><td><code>duplikat_von</code></td><td>Herkunft eines Duplikats</td><td>„Titel (Projekt-ID)“</td></tr>
+      <tr><td><code>duplikat_mischstand</code></td><td>Session des Originals als Vorlage</td><td>Pfad oder leer</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">Dazu liest Ottilie, wenn vorhanden, diese Projektfelder (nur Anzeige): <code>airDate</code>/<code>sendetermin</code>, <code>due</code>/<code>sendung_in</code>, <code>duration</code>/<code>laenge</code>, <code>cutter</code>/<code>editor</code>, <code>urgent</code> und das Metadatum <code>uebergeben_um</code> (sonst <code>createDate</code>).</p>
+</section>
+
+<section class="part" id="zustaende" aria-labelledby="h-zus">
+  <div class="part-head"><span class="who">Feld <code>zustand</code></span><h2 id="h-zus">Zustände</h2></div>
+  <ul class="states" aria-label="Zustände im Set „Mischung“">
+    <li><span class="st">bereit</span><span class="by">übergeben, frei</span></li>
+    <li><span class="st">übernommen</span><span class="by">Ottilie, gesperrt</span></li>
+    <li><span class="st">importiert</span><span class="by">Ottilie, Session angelegt</span></li>
+    <li><span class="st">ausgeliefert</span><span class="by">Ottilie beim Zurückliefern, entsperrt</span></li>
+    <li class="side"><span class="st">zurückgegeben</span><span class="by">nach „Freigeben“, entsperrt</span></li>
+  </ul>
+  <dl class="cases" style="margin-top:14px">
+    <dt>Übernehmen erlaubt</dt><dd><p>Aus <code>bereit</code>, <code>zurueckgegeben</code> und <code>ausgeliefert</code>, wenn das Projekt nicht gesperrt ist.</p></dd>
+    <dt>Gehört einem Mischer</dt><dd><p><code>uebernommen</code>, <code>importiert</code>, <code>in_mischung</code>, <code>exportiert</code> – dann nur dieser Mischer in diesem Raum.</p></dd>
+    <dt>Belegt den Raum</dt><dd><p><code>uebernommen</code>, <code>importiert</code>, <code>in_mischung</code>. Nach dem Zurückliefern gilt der Raum als frei.</p></dd>
+    <dt>Nicht von Ottilie gesetzt</dt><dd><p><code>in_mischung</code> (vorgesehen, bisher ohne Auslöser) und <code>exportiert</code> (bis 09.10.2026 der Zustand nach dem Zurückliefern; ältere Beiträge können ihn noch tragen).</p></dd>
+  </dl>
+</section>
+
+<section class="part" id="ausfall" aria-labelledby="h-aus">
+  <div class="part-head"><span class="who">Wenn Helmut nicht antwortet</span><h2 id="h-aus">Ausfall und Nachtrag</h2></div>
+  <p>Ist Helmut nicht erreichbar, arbeitet Ottilie weiter und merkt sich die Änderungen in einer Warteschlange auf dem Mac. Sie trägt sie alle 60 s nach, sobald Helmut antwortet, in der ursprünglichen Reihenfolge.</p>
+  <div class="tablewrap">
+  <table>
+    <caption>Was vorgemerkt wird und wie es nachgetragen wird</caption>
+    <thead><tr><th>Eintrag</th><th>Nachtragen</th><th>Konflikt</th></tr></thead>
+    <tbody>
+      <tr><td>Übernehmen (nur Havarie)</td><td>wie Übernehmen</td><td>Beitrag inzwischen anders vergeben oder gesperrt</td></tr>
+      <tr><td>Set „Mischung“</td><td>nur die geänderten Felder</td><td>Beitrag gehört nicht mehr demselben Mischer im selben Raum</td></tr>
+      <tr><td>Sperren, Entsperren</td><td>Status setzen</td><td>Entsperren entfällt, wenn ihn inzwischen jemand übernommen hat</td></tr>
+      <tr><td>Asset (WAV)</td><td>anlegen, wenn es noch nicht da ist</td><td>–</td></tr>
+      <tr><td>Nachricht</td><td>senden</td><td>–</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Konflikte überschreiben nichts. Sie stehen in der Titelleiste und lassen sich einzeln oder alle verwerfen; Einträge desselben Beitrags warten dahinter.</p>
+</section>
+
+<section class="part" id="einstellungen" aria-labelledby="h-ein">
+  <div class="part-head"><span class="who">Einstellungen › Verbindungen und Export</span><h2 id="h-ein">Einstellungen in Ottilie</h2></div>
+  <div class="tablewrap">
+  <table>
+    <caption>Was je Mac oder zentral eingetragen wird</caption>
+    <thead><tr><th>Einstellung</th><th>Bedeutung</th><th>Vorgabe</th><th>Stand</th></tr></thead>
+    <tbody>
+      <tr><td><code>system.schnittstellen.helmut.adresse</code></td><td>Server ohne Pfad</td><td><code>https://[helmut-server]</code></td><td><span class="pill">in Gebrauch</span></td></tr>
+      <tr><td><code>…helmut.anmeldeverfahren</code></td><td><code>passwort</code> oder <code>oauth</code></td><td><code>passwort</code></td><td><span class="pill">in Gebrauch</span></td></tr>
+      <tr><td><code>…helmut.schluesselbund_eintrag</code></td><td>Eintrag im Schlüsselbund mit Konto und Kennwort bzw. OAuth-Schlüssel und -Geheimnis</td><td><code>ottilie-helmut</code></td><td><span class="pill">in Gebrauch</span></td></tr>
+      <tr><td><code>export.verarbeitung_helmut.uebergabeordner</code></td><td>Ziel der WAVs; <code>{projektId}</code> wird ersetzt</td><td><code>/Volumes/Helmut/Mischung/{projektId}/</code></td><td><span class="pill">in Gebrauch</span></td></tr>
+      <tr><td><code>system.raeume_nutzer.nutzer</code></td><td>Nutzer mit Helmut-Benutzernamen (Benachrichtigungen)</td><td>leer</td><td><span class="pill">in Gebrauch</span></td></tr>
+      <tr><td><code>…helmut.metadaten_set_mischung</code>, <code>…_auslieferung</code></td><td>Namen der Metadaten-Sets</td><td>Mischung, Auslieferung</td><td><span class="pill later">vorgesehen</span> Name steht noch fest im Code</td></tr>
+      <tr><td><code>…helmut.anmeldung</code>, <code>…abfrageintervall_s</code></td><td>Service-Konto oder persönlich; Abfragetakt</td><td><code>service_konto</code>, 5 s</td><td><span class="pill later">vorgesehen</span></td></tr>
+      <tr><td><code>export.verarbeitung_helmut.*</code> (Streams, Jobs)</td><td>Sendefile durch Helmut bauen lassen: Streams „Ottilie Auslieferung“, „Ottilie Vorschau“, „Ottilie Prüfen“, Aufruf <code>custom_stream</code>, Ereignis <code>CUSTOM</code>, Endpunkt <code>FX</code>, Jobs alle 2 s abfragen, Rückfall lokal</td><td>siehe links</td><td><span class="pill later">vorgesehen</span></td></tr>
+      <tr><td><code>import.session_ablage.sperre_ueber_helmut</code>, <code>import.import_vorschau.triage_bericht_an_helmut</code></td><td>Sperre über Helmut; Triage-Bericht als Asset</td><td>an</td><td><span class="pill later">vorgesehen</span></td></tr>
+      <tr><td>Gemeinsame und persönliche Einstellungen</td><td>147 Einstellungen sind für die zentrale Ablage in Helmut vorgesehen, 6 für das Helmut-Nutzerprofil (Templates, Farbschema …)</td><td>–</td><td><span class="pill later">vorgesehen</span> bis dahin lokal</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">Die Adresse kommt aus der Geräteverwaltung (Konfigurationsprofil), wenn sie dort steht, und ist dann im Fenster gesperrt. Übergabeordner und Nutzerliste gehören zu den gemeinsamen Einstellungen.</p>
+</section>
+
+<section class="part" id="offen" aria-labelledby="h-off">
+  <div class="part-head"><span class="who">Mit MoovIT am echten System prüfen</span><h2 id="h-off">Zu klären</h2></div>
+  <p>Diese Punkte stehen im Code als <code>ANNAHME</code>. Der Mock verhält sich so; die Instanz des Hauses kann abweichen.</p>
+  <dl class="cases">
+    <dt>Entsperren</dt><dd><p>Ottilie sendet <code>UNLOCKED</code>. Die OpenAPI zählt für den Projektstatus nur <code>LOCKED</code>, <code>HOUSEKEEPER</code>, <code>RESTORED</code> und <code>ARCHIVED</code> auf. Wie wird entsperrt?</p></dd>
+    <dt>Metadaten schreiben</dt><dd><p>Ersetzt <code>PUT /v1/fx/projects/metadata/{id}</code> die ganze Liste? Ottilie schickt deshalb immer alle Einträge. Muss das Set am Projekt-Template hängen, oder darf Ottilie fehlende Felder anlegen?</p></dd>
+    <dt>Suche</dt><dd><p>Ohne Filter kommen bis zu 500 Projekte. Wie filtert man auf Gruppen oder auf Projekte mit Set „Mischung“?</p></dd>
+    <dt>Sendung</dt><dd><p>Steht die Sendung in der Projektgruppe (<code>group</code>)?</p></dd>
+    <dt>Pfade</dt><dd><p>Ist der <code>filepath</code> eines Assets auf den Macs unter demselben Pfad erreichbar? Sonst braucht Ottilie eine Pfadumsetzung.</p></dd>
+    <dt>Übergabe</dt><dd><p>Erkennung von AAF, Video und Manifest an der Dateiendung bzw. am Namen. Gibt es eine verlässlichere Kennzeichnung?</p></dd>
+    <dt>Duplikat</dt><dd><p>Ottilie schickt das Projekt des Originals mit neuem Namen. Was übernimmt Helmut dabei (Assets, Metadaten, Status)?</p></dd>
+    <dt>Assets anlegen</dt><dd><p><code>mimeType</code> <code>AUDIO</code>, <code>customMetadata</code> mit <code>art</code>, <code>createBinStructure=true</code> – passt das zur Konfiguration des Hauses?</p></dd>
+    <dt>Benachrichtigung</dt><dd><p>Format <code>{"msg", "expandDialog"}</code> und ob Cutter Helmut-Benutzer sind.</p></dd>
+    <dt>Zusatzfelder</dt><dd><p>Namen für Sendetermin, Länge, Cutter, „dringend“ und Übergabezeit in der Instanz des Hauses.</p></dd>
+    <dt>Rechte</dt><dd><p>Welche Rechte bekommt das Service-Konto, und wer darf freigeben (offener Punkt 7)?</p></dd>
+    <dt>Verarbeitung durch Helmut</dt><dd><p>Set „Auslieferung“, Streams und Jobs sind vorgesehen, aber nicht gebaut; im Normalbetrieb gehen nur WAVs an Helmut.</p></dd>
+  </dl>
+  <h3>Endpunkte aus dem Auftrag, die Ottilie noch nicht nutzt</h3>
+  <ul class="plain">
+    <li><code>POST /v1/co/search</code>, <code>POST /v1/co/assets/getByPath</code>, <code>PATCH /v1/co/assets/metadata</code>, <code>POST /v1/co/ingest</code></li>
+    <li><code>PUT /v1/fx/projects</code> (Ottilie schreibt nur die Metadaten)</li>
+    <li><code>GET /v1/members/users/name/{username}</code></li>
+    <li><code>GET /v1/fx/projects/execute/custom/{projectId}/{streamId}</code>, <code>POST /v1/streams/execute/{event}/{endpoint}</code>, <code>GET /v1/io/jobs/{id}</code>, <code>POST /v1/io/jobs/search</code></li>
+    <li><code>/v1/preferences</code>, <code>GET /v1/storage</code></li>
+  </ul>
+</section>
+
+<footer>
+  <p>Quelle: Ottilie-Code (<code>tonmischung/helmut/client.py</code>, <code>mapping.py</code>, <code>service.py</code>, <code>catchup.py</code>), Auftrag V1 Abschnitt 4–5, Helmut4-OpenAPI. Getestet gegen den Helmut-Mock (780 Tests), noch nicht gegen die Instanz des Hauses.</p>
+</footer>
+</div>
+
+</body>
+</html>
