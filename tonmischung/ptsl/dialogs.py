@@ -50,8 +50,9 @@ def dialog_names(windows: Iterable[Mapping]) -> list[str]:
 
 
 SCREEN_CAPTURE_HINT = ("Ohne das Recht „Bildschirmaufnahme“ erkennt Ottilie Pro-Tools-Dialoge nur als „Meldung von "
-                       "Pro Tools“ – „Missing Files“ wird dann nicht nach Einstellung beantwortet. Systemeinstellungen "
-                       "→ Datenschutz & Sicherheit → Bildschirm- und Systemaudioaufnahme → Ottilie einschalten.")
+                       "Pro Tools“ – „Missing Files“ und „Missing AAX Plugins“ werden dann nicht beantwortet. "
+                       "Systemeinstellungen → Datenschutz & Sicherheit → Bildschirm- und Systemaudioaufnahme → Ottilie "
+                       "einschalten.")
 
 
 def screen_capture_allowed() -> bool | None:

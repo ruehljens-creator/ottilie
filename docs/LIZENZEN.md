@@ -1,4 +1,4 @@
-# Ottilie 0.1.0 – mitgelieferte Software
+# Ottilie 0.1 – mitgelieferte Software
 
 Erzeugt mit `python3 -m tonmischung lizenzen`. Lizenz, Urheber, Projekt und – bei Werkzeugen und Bibliotheken – der Quelltext genau der mitgelieferten Version (unverändert). Die Lizenztexte liegen im Paket unter `bin/licenses/`, die der Schrift unter `ui/fonts/`.
 

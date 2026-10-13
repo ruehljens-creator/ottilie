@@ -11,6 +11,11 @@ EBU R 128 an Helmut zurück. Fällt Helmut aus, baut Ottilie das Sendefile selbs
 Die Aufnahme- und Exportfunktionen von [PunchBuddy](https://github.com/ruehljens-creator/punchbuddy-protools)
 (Punch-In, Transport, Exporte, Stream Deck, Webtrigger) sind eingebunden.
 
+## Download
+
+Fertiges Paket im Release [v0.1](../../releases/tag/v0.1): `Ottilie-0.1-apple-silicon.dmg` (Apple Silicon, macOS 26).
+Was jede Version enthält: [CHANGELOG.md](CHANGELOG.md).
+
 ## Schnellstart
 
 ```
@@ -37,7 +42,7 @@ Verbindungsfehler, alles andere lässt sich trotzdem ansehen.
 
 ## Stand
 
-Version 1, in der Erprobung. Gegen Pro Tools 2026 live geprüft; Helmut bisher nur gegen den Mock nach der
+Version 0.1, in der Erprobung. Gegen Pro Tools 2026 live geprüft; Helmut bisher nur gegen den Mock nach der
 offiziellen OpenAPI. Was gegen die echte Helmut-Instanz noch zu prüfen ist, steht in
 `docs/Ottilie_an_Helmut.html`.
 

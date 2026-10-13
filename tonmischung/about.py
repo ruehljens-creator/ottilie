@@ -36,7 +36,8 @@ COMPONENTS: tuple[Component, ...] = (
     Component("PunchBuddy", "MIT", "Jens Rühl (ruehljens-creator)",
               "https://github.com/ruehljens-creator/punchbuddy-protools",
               "Punch-In, Transport, Exporte, Lautheit, Stream Deck, Vocaster", "grundlage", version="2.1.1"),
-    Component("Hedwig (AAF-Erkennung)", "alle Rechte vorbehalten", "Jens Rühl", "", "AAF-Triage: Paare, Inhalt", "grundlage"),
+    Component("Hedwig (AAF-Erkennung)", "alle Rechte vorbehalten", "Jens Rühl", "", "AAF-Triage: Paare, Inhalt",
+              "grundlage"),
     Component("Pro Tools Scripting Library (PTSL)", "Avid PTSL SDK", "Avid Technology, Inc.",
               "https://developer.avid.com", "Steuerung von Pro Tools", "grundlage"),
     # ── Python-Pakete ────────────────────────────────────────────────────────
