@@ -8,19 +8,22 @@ import threading
 
 from tonmischung.app.bridge import Bridge, CommandError
 from tonmischung.app.context import AppContext
+from tonmischung.core import mixstate
+from tonmischung.helmut.client import HelmutAuthError, HelmutError, HelmutUnavailableError
 
 _catchup_lock = threading.Lock()
 
 
 def catch_up(ctx: AppContext, args: dict | None = None) -> dict:
-    """Liegengebliebene Helmut-Änderungen jetzt nachtragen (auch vom 60-s-Takt der App)."""
+    """Liegengebliebene Änderungen jetzt nachtragen. Der 60-s-Takt der App (`nur_eigene`) nimmt nur die Einträge
+    dieses macOS-Benutzers; im Fenster („Jetzt nachtragen“) auch die anderer Benutzer des Macs."""
     from tonmischung.helmut.catchup import replay
     if ctx.queue is None:
         return {"text": "keine Warteschlange", "offen": 0, "konflikte": []}
     if not _catchup_lock.acquire(blocking=False):
         return {"text": "Nachtragen läuft schon", **ctx.queue.summary()}
     try:
-        report = replay(ctx.queue, ctx.helmut)
+        report = replay(ctx.queue, ctx.helmut, only_own=bool((args or {}).get("nur_eigene")))
     finally:
         _catchup_lock.release()
     return {"text": report.text, **ctx.queue.summary()}
@@ -50,10 +53,32 @@ def assign_havarie(ctx: AppContext, args: dict) -> dict:
     """Havarie-Session einem Helmut-Beitrag zuordnen und gleich nachtragen."""
     if ctx.queue is None:
         raise CommandError("keine Warteschlange")
-    n = ctx.queue.assign(str(args.get("havarie") or ""), str(args.get("id") or "").strip())
+    pid = str(args.get("id") or "").strip()
+    _check_assignable(ctx, pid)
+    n = ctx.queue.assign(str(args.get("havarie") or ""), pid)
     if not n:
         raise CommandError("Nichts zuzuordnen (schon zugeordnet oder unbekannt)")
     return catch_up(ctx)
+
+
+def _check_assignable(ctx: AppContext, project_id: str) -> None:
+    """Wurde der Beitrag inzwischen übernommen (auch von diesem Mischer, normal geholt) oder ausgeliefert, überschriebe
+    die Havarie-Übernahme diesen Stand – dann nicht zuordnen (Ausfall R3, R7). Ist Helmut weg, prüft der
+    Nachtrag später dasselbe (`mixstate.havarie_blocker`). Eine falsche ID wird gemeldet, nicht geschluckt."""
+    try:
+        m = ctx.helmut.get(project_id).mix
+    except (HelmutUnavailableError, HelmutAuthError):
+        # Ohne Helmut lässt sich nicht prüfen, ob der Beitrag inzwischen normal geholt wurde – der Nachtrag hielte das
+        # für die eigene Havarie-Übernahme (Prüfer 11.11.2026). Also erst zuordnen, wenn Helmut antwortet.
+        raise CommandError("Zuordnen geht nur, wenn Helmut erreichbar ist – bitte später erneut") from None
+    except HelmutError as e:
+        if e.status == 404:
+            raise CommandError(f"Beitrag „{project_id}“ in Helmut nicht gefunden") from None
+        raise CommandError(f"Helmut meldet einen Fehler ({e.status or 'unbekannt'}) – bitte später erneut") from None
+    blocker = mixstate.havarie_blocker(m, ctx.mixer, ctx.room)
+    if blocker:
+        raise CommandError(f"Nicht zugeordnet – {blocker}. Verwerfen nimmt nur die Einträge aus dem Nachtrag; die "
+                           "Havarie-Session bleibt auf der Platte erhalten.")
 
 
 def register(bridge: Bridge, ctx: AppContext) -> None:

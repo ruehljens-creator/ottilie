@@ -137,3 +137,27 @@ def test_ziele_vorwahl_havarieordner_und_usb(tmp_path, monkeypatch):
     t = HA._targets({"ziele": [{"art": "havarieordner"}]}, str(ziel))
     assert [(x.name, x.path, x.protocol) for x in t] == [("Havarie-Ordner Havarie-Ordner", str(ziel), "ordner")]
     assert HA._targets({"ziele": [{"art": "havarieordner"}]}, "") == []
+
+
+def test_videoid_kommt_in_den_auftrag(tmp_path, monkeypatch):
+    """Review 11.11.2026: die VideoID kam nie im Havarie-Sendefile an (Request ohne videoid)."""
+    from tonmischung.app.bridge import Bridge
+    from tonmischung.app.jobs import JobRunner
+    from tonmischung.delivery.manifest import clip_name
+    runner = JobRunner(Bridge(emit=lambda p: None, inline=True))
+    path = _paket(tmp_path, "Wahl.mxf")
+    monkeypatch.setattr(HA, "_tools", lambda ctx: HA.H.Tools("/x/ffmpeg", "/x/ffprobe", "/x/bmxtranswrap"))
+    seen = []
+
+    def capture(req, **kw):
+        seen.append(req)
+        raise HA.H.HavarieDeliveryError("nur geprüft")
+    monkeypatch.setattr(HA.H, "deliver_havarie", capture)
+    ctx = _ctx(tmp_path)
+    with pytest.raises(CommandError, match="Zeilenumbruch"):
+        HA.start(ctx, runner, {"path": path, "title": "Wahl", "videoid": "VID\n1"})
+    ctx.settings.set_local("export.notweg_bericht.videoid_pflicht", True)
+    with pytest.raises(CommandError, match="VideoID fehlt"):
+        HA.start(ctx, runner, {"path": path, "title": "Wahl"})
+    HA.start(ctx, runner, {"path": path, "title": "Wahl", "videoid": " VID-7 "})
+    assert seen[0].videoid == "VID-7" and clip_name(seen[0].videoid, seen[0].title) == "VID-7 Wahl"

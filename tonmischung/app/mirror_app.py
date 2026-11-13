@@ -115,12 +115,13 @@ class MirrorWatcher:
 
     def _register(self, c: Any, path: str) -> None:
         """Gespiegelte Session einmal als Asset melden (nicht doppelt, bei Ausfall nachgetragen)."""
-        from tonmischung.helmut.client import HelmutError, HelmutUnavailableError
+        from tonmischung.helmut.client import HelmutError
+        from tonmischung.helmut.service import QUEUED
         try:
             if not any((a.get("filepath") or a.get("path")) == path for a in self.ctx.helmut.assets(c.id)):
                 self.ctx.service().add_asset_or_queue(c, path, "session")
             self._assets.add(path)
-        except HelmutUnavailableError:
+        except QUEUED:
             pass                                               # beim nächsten Spiegeln erneut
         except HelmutError as e:
             log.warning("Session nicht als Asset gemeldet: %s", e)

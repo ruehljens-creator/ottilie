@@ -1,5 +1,5 @@
 # Paketversionen für den Bau von Ottilie (Intel und Apple Silicon gleich).
-# Erzeugt mit tools/lock_requirements.py unter Python 3.14.4 – nicht von Hand ändern.
+# Erzeugt mit tools/lock_requirements.py unter Python 3.14.5 – nicht von Hand ändern.
 # Einrichten: tools/venv_bau.sh
 altgraph==0.17.5
 annotated-types==0.7.0
@@ -59,3 +59,4 @@ starlette==1.2.0
 typing-extensions==4.15.0
 typing-inspection==0.4.2
 uvicorn==0.48.0
+websockets==17.4

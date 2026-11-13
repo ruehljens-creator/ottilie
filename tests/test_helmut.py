@@ -96,6 +96,213 @@ def test_anmeldung_per_oauth(mock):
     assert ("POST", "/v1/members/auth/oauth") in mock.requests
 
 
+def _token_client(mock, secret):
+    from tonmischung.helmut.client import LOGIN_TOKEN
+    secrets = [secret] if isinstance(secret, str) else secret        # Liste: Schlüsselbund ändert sich je Lesen
+    return HelmutClient(mock.url, lambda: ("", secrets.pop(0) if len(secrets) > 1 else secrets[0]),
+                        sleep=lambda s: None, login_method=LOGIN_TOKEN)
+
+
+def test_anmeldung_per_bearer_token(mock):
+    mock.tokens.add("api-token")
+    assert _token_client(mock, "Bearer api-token\n").get("p1").title
+    assert not any(path.startswith("/v1/members/auth") for _, path in mock.requests)   # kein Anmeldeaufruf
+
+
+def test_bearer_token_abgelehnt_ohne_neuanmeldung(mock):
+    from tonmischung.helmut.client import TOKEN_REJECTED, HelmutAuthError
+    with pytest.raises(HelmutAuthError) as e:
+        _token_client(mock, "falsch").get("p1")
+    assert e.value.status == 401 and str(e.value) == TOKEN_REJECTED
+    assert mock.requests == [("GET", "/v1/fx/projects/p1"), ("GET", "/v1/members/auth/whoami")]  # kein Anmeldeaufruf
+
+
+def test_abgelehnter_einzelner_aufruf_ist_kein_anmeldefehler(mock):
+    """Review 10.11.2026: Lehnt Helmut nur diesen Aufruf ab (Benachrichtigung ohne Admin-Rolle), hieß es fälschlich
+    „Token prüfen“ – und der Nachtrag hätte gewartet statt gezählt."""
+    from tonmischung.helmut.client import CALL_REJECTED, HelmutAuthError
+    mock.tokens.add("gut")
+    mock.notify_denied = 401
+    with pytest.raises(HelmutError) as e:
+        _token_client(mock, "gut").notify("awolf", "Freigegeben", "Bahnstreik")
+    assert not isinstance(e.value, HelmutAuthError) and e.value.status == 401 and CALL_REJECTED in str(e.value)
+    with pytest.raises(HelmutError) as e:
+        _client(mock).notify("awolf", "Freigegeben", "Bahnstreik")          # Kennwort: dasselbe nach Neuanmeldung
+    assert not isinstance(e.value, HelmutAuthError) and CALL_REJECTED in str(e.value)
+
+
+def test_neues_token_im_schluesselbund_gilt_sofort(mock):
+    """Review 10.11.2026: nach dem Eintragen eines neuen Tokens kam bis zum nächsten Takt der Titelleiste 401."""
+    mock.tokens.add("neu")
+    client = _token_client(mock, ["alt", "neu"])
+    assert client.get("p1").id == "p1"
+    assert mock.requests.count(("GET", "/v1/fx/projects/p1")) == 2
+
+
+@pytest.mark.parametrize("secret, match", [("  ", "Kein Bearer-Token"), ("abc\ndef", "unzulässige Zeichen"),
+                                           ("„abc“", "unzulässige Zeichen"), ("ab cd", "unzulässige Zeichen")])
+def test_bearer_token_ungeeignet(mock, secret, match):
+    """Review 10.11.2026: ein Umbruch mitten im Token gab einen ValueError samt Token im Text."""
+    from tonmischung.helmut.client import HelmutAuthError
+    with pytest.raises(HelmutAuthError, match=match) as e:
+        _token_client(mock, secret).get("p1")
+    assert (not secret.strip() or secret.strip() not in str(e.value)) and mock.requests == []
+
+
+def test_bearer_token_formen():
+    from tonmischung.helmut.mapping import bearer_token, valid_bearer
+    assert bearer_token("abc") == bearer_token("Bearer abc") == bearer_token("bearer%20abc\n") == "abc"
+    assert bearer_token("Bearer%20abc%3D%3D") == "abc==" and bearer_token("a+b/c==") == "a+b/c=="
+    assert valid_bearer("eyJh.eyJz-_~+/.sig==") and not valid_bearer("a\nb") and not valid_bearer("")
+
+
+def test_erreichbar_mit_bearer_token_fragt_helmut(mock):
+    from tonmischung.helmut.client import TOKEN_REJECTED, HelmutAuthError
+    client = _token_client(mock, "falsch")
+    with pytest.raises(HelmutAuthError) as e:
+        client.reachable()
+    assert str(e.value) == TOKEN_REJECTED                               # Titelleiste: dieselbe Meldung
+    mock.tokens.add("falsch")
+    client.reachable()
+    assert mock.requests.count(("GET", "/v1/members/auth/whoami")) == 2 and client.last_ok is not None
+
+
+def test_falsches_kennwort_ist_ein_anmeldefehler(mock):
+    from tonmischung.helmut.client import HelmutAuthError
+    with pytest.raises(HelmutAuthError) as e:
+        _client(mock, password="falsch").get("p1")
+    assert e.value.status == 401
+
+
+def _serve(handler):
+    import http.server
+    import threading
+    srv = http.server.HTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def test_token_nur_an_denselben_server_weitergeleitet():
+    """Review 10.11.2026: urllib gab `Authorization` bei einer Weiterleitung an jeden Host weiter."""
+    import http.server
+    seen = []
+
+    class Target(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen.append((self.path, self.headers.get("Authorization")))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"id": "p1"}')
+
+        def log_message(self, *a):
+            pass
+    target = _serve(Target)
+    other = f"http://localhost:{target.server_address[1]}"
+
+    class Redirect(Target):
+        def do_GET(self):
+            if self.path.startswith("/weiter"):
+                return super().do_GET()
+            self.send_response(302)
+            self.send_header("Location", "/weiter" if "gleich" in self.path else other + "/fremd")
+            self.end_headers()
+    helmut = _serve(Redirect)
+    from tonmischung.helmut.client import LOGIN_TOKEN
+    client = HelmutClient(f"http://127.0.0.1:{helmut.server_address[1]}", lambda: ("", "geheim"),
+                          sleep=lambda s: None, login_method=LOGIN_TOKEN)
+    client.request("GET", "/gleich")
+    client.request("GET", "/anders")
+    assert seen == [("/weiter", "Bearer geheim"), ("/fremd", None)]
+    helmut.shutdown()
+    target.shutdown()
+
+
+@pytest.mark.parametrize("echo", ["{a}", "{json}", "{b64}", "{pct}", "{ent}", "{part}"])
+def test_token_steht_nie_in_der_fehlermeldung(echo):
+    """Review 10.11.2026: spiegelt ein Server die Anfrage zurück, stand das Token in der Meldung – auch kodiert."""
+    import base64
+    import http.server
+    token = "geheim.tok/en-1234"
+
+    class Echo(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            a = self.headers.get("Authorization")
+            text = echo.format(a=a, json=a.replace("/", "\\/"), b64=base64.b64encode(a.encode()).decode(),
+                               pct=token.replace("/", "%2f"), ent=token.replace("/", "&#x2F;"), part=token[:9])
+            self.send_response(403)
+            self.end_headers()
+            self.wfile.write(f"verboten: {text}".encode())
+
+        def log_message(self, *a):
+            pass
+    srv = _serve(Echo)
+    from tonmischung.helmut.client import LOGIN_TOKEN
+    client = HelmutClient(f"http://127.0.0.1:{srv.server_address[1]}", lambda: ("", token),
+                          sleep=lambda s: None, login_method=LOGIN_TOKEN)
+    with pytest.raises(HelmutError) as e:
+        client.request("GET", "/x")
+    assert str(e.value) == "Helmut lehnt GET /x ab (403)" and e.value.__cause__ is None
+    srv.shutdown()
+
+
+def test_anmeldung_spiegelt_keine_zugangsdaten():
+    """Review 10.11.2026: Antworten der Anmeldung (Kennwort, OAuth-Geheimnis) kommen nie in die Meldung."""
+    import http.server
+
+    class Echo(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            self.send_response(401)
+            self.end_headers()
+            self.wfile.write(b"invalid credentials: " + body)
+
+        def log_message(self, *a):
+            pass
+    srv = _serve(Echo)
+    from tonmischung.helmut.client import LOGIN_OAUTH, HelmutAuthError
+    for method in ("passwort", LOGIN_OAUTH):
+        client = HelmutClient(f"http://127.0.0.1:{srv.server_address[1]}", lambda: ("konto", "Geheim-42"),
+                              sleep=lambda s: None, login_method=method)
+        with pytest.raises(HelmutAuthError) as e:
+            client.get("p1")
+        assert "Geheim" not in str(e.value) and e.value.__cause__ is None
+    srv.shutdown()
+
+
+def test_post_wird_nicht_weitergeleitet():
+    """Review 10.11.2026: aus einem POST machte urllib bei 302 still einen GET, der als Erfolg galt."""
+    import http.server
+
+    class Redirect(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.send_response(302)
+            self.send_header("Location", "/anders")
+            self.end_headers()
+
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", "http://127.0.0.1:99999/kaputt")       # ungültiger Port
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+    srv = _serve(Redirect)
+    client = HelmutClient(f"http://127.0.0.1:{srv.server_address[1]}", lambda: ("", "tok"),
+                          sleep=lambda s: None, login_method="token")
+    with pytest.raises(HelmutError, match="leitet POST /v1/co/assets weiter"):
+        client.request("POST", "/v1/co/assets", {"x": 1})
+    with pytest.raises(HelmutError, match="weiter"):                      # kein roher ValueError
+        client.request("GET", "/x")
+    srv.shutdown()
+
+
+def test_derselbe_server():
+    from tonmischung.helmut.client import _same_server
+    assert _same_server("https://h/a", "https://H:443/b") and _same_server("http://h/a", "https://h/b")
+    assert not _same_server("https://h/a", "http://h/b") and not _same_server("http://h/a", "http://h:8080/b")
+    assert not _same_server("http://h/a", "http://anders/b") and not _same_server("http://h/a", "http://h:99999/b")
+
+
 def test_rueckgabe_asset_und_nachricht(mock):
     client = _client(mock)
     a = client.add_asset("p1", "/H/p1/Rueckgabe/ST.wav", "tonspur")
@@ -111,7 +318,7 @@ def test_falsche_zugangsdaten(mock):
     assert e.value.status == 401
 
 
-def test_abgelaufenes_token_fuehrt_zu_neuanmeldung(mock):
+def test_401_fuehrt_zu_neuanmeldung(mock):
     client = _client(mock)
     client.get("p1")
     mock.expire_tokens()
@@ -302,3 +509,116 @@ def test_sperre_eines_anderen_bleibt(mock, monkeypatch):
     with pytest.raises(ConflictError):
         service.take("p1")
     assert mock.status("p1") == "LOCKED" and mock.mix_value("p1", "mischer") == "A. Wolf"
+
+
+def test_asset_art_und_mimetype():
+    from tonmischung.helmut.mapping import new_asset
+    assert [new_asset("p", "/x", k)["mimeType"] for k in ("tonspur", "extern", "session", "metadaten")] == [
+        "AUDIO", "AUDIO", "AUDIO", "DATA"]
+
+
+def test_leere_neue_felder_werden_nicht_angelegt():
+    from tonmischung.core.mixstate import MixState
+    from tonmischung.helmut.mapping import metadata_with_mix
+    project = {"metadata": [{"name": "videoid", "value": "VID-1", "parent": [{"name": "Mischung"}]}]}
+    names = {m["name"]: m["value"] for m in metadata_with_mix(project, MixState(mixer="Jens"))}
+    assert names["mischer"] == "Jens" and names["videoid"] == ""                 # vorhandenes Feld wird geleert
+    assert "template" not in names and "rueckgabe_grund" not in names            # fehlt und leer: nicht anlegen
+
+
+def test_sperre_ohne_antwort_wird_zurueckgenommen_und_spaeter_uebernehmbar(mock):
+    """Ausfall: die Sperre kommt an, die Antwort nicht – Ottilie nimmt die eigene Sperre zurück; bleibt sie doch
+    stehen, darf derselbe Mischer den Beitrag trotzdem übernehmen (Jens 11.11.2026)."""
+    from tonmischung.helmut.client import HelmutUnavailableError
+    from tonmischung.helmut.service import MixService
+    client = _client(mock)
+    real = client.set_locked
+    calls = []
+
+    def lost(pid, locked):
+        calls.append(locked)
+        real(pid, locked)
+        if locked:
+            raise HelmutUnavailableError("Helmut hat nicht geantwortet", sent_unknown=True)
+    client.set_locked = lost
+    svc = MixService(client, "Jens", "Ton 3", now=lambda: "jetzt", sleep=lambda s: None)
+    with pytest.raises(HelmutUnavailableError):
+        svc.take("p1")
+    assert calls == [True, False] and mock.status("p1") == "UNLOCKED"          # eigene Sperre zurückgenommen
+    mock.set_status("p1", "LOCKED")                                             # … oder sie blieb doch stehen
+    client.set_locked = real
+    assert svc.take("p1").mix.mixer == "Jens"
+
+
+
+def test_zwei_raeume_zugleich_nur_einer_uebernimmt(mock):
+    """Prüfer 11.11.2026: A hat gesperrt, schreibt aber noch – B sieht „gesperrt, kein Mischer“. B wartet kurz und
+    liest neu; steht dann A drin, ist es ein Konflikt (vorher meldeten beide Erfolg)."""
+    from tonmischung.core.mixstate import ConflictError
+    from tonmischung.helmut.service import STALE_WAIT_S, MixService
+    a = MixService(_client(mock), "Jens", "Ton 3", now=lambda: "jetzt")
+    mock.set_status("p1", "LOCKED")                         # A hat gesperrt …
+    waited = []
+
+    def a_writes_meanwhile(s):
+        waited.append(s)
+        c = a.client.get("p1")                              # … und schreibt, während B wartet
+        from tonmischung.core import mixstate
+        a.client.write_mix(c, mixstate.after_take(c.mix, "Jens", "Ton 3", "jetzt"))
+    b = MixService(_client(mock), "B. Bauer", "Ton 2", now=lambda: "jetzt", sleep=a_writes_meanwhile)
+    with pytest.raises(ConflictError, match="Jens"):
+        b.take("p1")
+    assert waited == [STALE_WAIT_S] and mock.mix_value("p1", "mischer") == "Jens"
+
+
+def test_gleichzeitig_geschrieben_letzter_gewinnt_der_andere_merkt_es(mock):
+    """Schreibt der andere nach uns, merkt es die Nachprüfung nach dem eigenen Schreiben."""
+    from tonmischung.core import mixstate
+    from tonmischung.core.mixstate import ConflictError
+    from tonmischung.helmut.service import MixService
+    client = _client(mock)
+    real = client.write_mix
+
+    def overtaken(current, mix):
+        r = real(current, mix)
+        c = client.get("p1")
+        real(c, mixstate.after_take(mixstate.MixState(), "A. Wolf", "Ton 2", "jetzt"))
+        return r
+    client.write_mix = overtaken
+    with pytest.raises(ConflictError, match="gleichzeitig von A. Wolf"):
+        MixService(client, "Jens", "Ton 3", now=lambda: "jetzt").take("p1")
+    assert mock.status("p1") == "LOCKED"                    # die Sperre gehört jetzt A. Wolf – bleibt
+
+
+def test_abgelehnte_sperre_wird_nicht_zurueckgenommen(mock):
+    """Ausfall R7 (K2): lehnt Helmut das Sperren ab, ist es nicht unsere Sperre – nicht entsperren."""
+    from tonmischung.helmut.client import HelmutError
+    from tonmischung.helmut.service import MixService
+    client = _client(mock)
+    calls = []
+
+    def refuse(pid, locked):
+        calls.append(locked)
+        raise HelmutError("Helmut lehnt PUT … ab (409)", status=409)
+    client.set_locked = refuse
+    with pytest.raises(HelmutError):
+        MixService(client, "Jens", "Ton 3", now=lambda: "jetzt").take("p1")
+    assert calls == [True]
+
+
+def test_eigener_gesperrter_beitrag_ohne_wartezeit(mock):
+    """Erneutes Holen des eigenen (gesperrten) Beitrags wartet nicht – nur eine Sperre ohne Besitzer kostet Zeit."""
+    from tonmischung.helmut.service import MixService
+    slept = []
+    svc = MixService(_client(mock), "Jens", "Ton 3", now=lambda: "jetzt", sleep=slept.append)
+    svc.take("p1")
+    svc.take("p1")
+    assert slept == [] and mock.status("p1") == "LOCKED"
+
+
+def test_sperre_ohne_besitzer_wartet_vor_und_nach_dem_schreiben(mock):
+    from tonmischung.helmut.service import STALE_WAIT_S, MixService
+    mock.set_status("p1", "LOCKED")
+    slept = []
+    MixService(_client(mock), "Jens", "Ton 3", now=lambda: "jetzt", sleep=slept.append).take("p1")
+    assert slept == [STALE_WAIT_S, STALE_WAIT_S] and mock.mix_value("p1", "mischer") == "Jens"

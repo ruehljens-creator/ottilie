@@ -182,3 +182,22 @@ def test_audio_verschieben_als_spurpaare():
     assert 'aria-label="Quelle, Paar ${i + 1}"' in block and 'aria-label="Ziel, Paar ${i + 1}"' in block
     assert 'aria-label="Paar ${i + 1} entfernen"' in block and "+ Spurpaar" in block and "Spuren aus Pro Tools lesen" in block
     assert '"aufnahme.audio_verschieben.quellspuren"' in JS and '"aufnahme.audio_verschieben.zielspuren"' in JS
+
+
+def test_anmeldung_waehlt_nur_vorhandene_nutzer_vor():
+    """Live 13.11.2026: Standard-Nutzer „jens“, die App kannte nur „admin“ – der Dialog schickte „jens“."""
+    import json
+    import shutil
+    import subprocess
+    assert "sel: loginChoice(u)" in JS
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node fehlt – nur statisch geprüft")
+    fn = re.search(r"function loginChoice\(u\) \{.*?\n\}", JS, re.S).group(0)
+    cases = [({"users": [{"id": "admin"}], "standard": "jens", "current": None}, "admin"),
+             ({"users": [{"id": "admin"}, {"id": "jens"}], "standard": "jens", "current": None}, "jens"),
+             ({"users": [{"id": "admin"}, {"id": "jens"}], "standard": "jens", "current": {"id": "admin"}}, "admin"),
+             ({"users": [], "standard": "jens", "current": None}, "")]
+    script = fn + "\nconsole.log(JSON.stringify(" + json.dumps([c for c, _ in cases]) + ".map(loginChoice)));"
+    out = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=20, check=True).stdout
+    assert json.loads(out) == [want for _, want in cases]

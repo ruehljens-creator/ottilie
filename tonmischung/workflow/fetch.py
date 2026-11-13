@@ -263,6 +263,13 @@ def plan_for_open_session(ptsl: PtslClient, is_delivered: Callable[[str], bool],
     return opened, plan
 
 
+def handover_nr(handover: Handover) -> dict:
+    """Betriebsart Übergabeordner: die importierte Fassung gehört an den Import, nicht ans Übernehmen (Review,
+    3. Runde: sonst galt eine während des Imports nachgelegte oder beim „letzten Stand“ nie importierte Fassung als
+    gemischt). Mit der Helmut-API: nichts."""
+    return {"handover_nr": str(handover.number)} if handover.number else {}
+
+
 def load_handover(service: MixService, project_id: str,
                   log: Callable[[str], None] = lambda m: None) -> tuple[Contribution, Handover, AafInfo]:
     """Beitrag lesen, prüfen, ob er übernommen werden darf, Übergabe und AAF prüfen – ohne etwas zu ändern."""
@@ -559,7 +566,8 @@ def fetch(project_id: str, *, service: MixService, ptsl: PtslClient,
     mirror = os.path.join(mirror_parent, name) if mirror_parent else ""
     contribution, hint = service.set_state_or_queue(contribution, mixstate.IMPORTED, session_path=session_path,
                                                     session_storage=session_storage, session_mirror=mirror,
-                                                    template=f"{template_group}/{template_name}")
+                                                    template=f"{template_group}/{template_name}",
+                                                    **handover_nr(handover))
     if hint:
         warnings.append(hint)
     log(f"Fertig: {session_path}")

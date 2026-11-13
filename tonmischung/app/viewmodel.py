@@ -27,6 +27,9 @@ def is_mine(c: Contribution, mixer: str, room: str) -> bool:
 def _pill(c: Contribution, mixer: str, room: str) -> tuple[str, str]:
     """(Text, CSS-Klasse) der Status-Plakette."""
     s = c.mix.state
+    handover = _raw(c).get("uebergabe")                    # Betriebsart Übergabeordner: Stand des Filmordners
+    if handover in ("unvollstaendig", "wird_uebertragen") and s not in mixstate.OWNED:
+        return _raw(c).get("uebergabe_text") or handover, "busy"
     if s in mixstate.OWNED:
         if is_mine(c, mixer, room):
             return f"meine Mischung · {STATE_TEXT[s]}", "mine"
@@ -36,6 +39,10 @@ def _pill(c: Contribution, mixer: str, room: str) -> tuple[str, str]:
     if s == mixstate.RETURNED:
         return "zurückgegeben · bereit", "ready"
     return STATE_TEXT.get(s, s), "ready"
+
+
+def _raw(c: Contribution) -> dict:
+    return c.raw if isinstance(c.raw, dict) else {}
 
 
 def _field(c: Contribution, *names: str) -> str:
@@ -81,6 +88,13 @@ def rows(contributions: Sequence[Contribution], mixer: str, room: str, query: st
     else:
         shown.sort(key=by_time)
     out = []
+    folders = {str(_raw(c).get("uebergabeordner") or "") for c in contributions}
+    several = len(folders - {""}) > 1                # mehrere Übergabeordner: Herkunft zeigen (Jens 13.11.2026)
+    from tonmischung.dropfolder.multi import MAIN_NAME, STALE
+
+    def origin_folder(c: Contribution) -> str:       # der erste Ordner ohne eigenen Namen bleibt ohne Angabe
+        name = str(_raw(c).get("uebergabeordner") or "")
+        return name if (several or _raw(c).get(STALE)) and name != MAIN_NAME else ""
     for c in shown:
         text, cls = _pill(c, mixer, room)
         t = handover_time(c)
@@ -88,6 +102,8 @@ def rows(contributions: Sequence[Contribution], mixer: str, room: str, query: st
                     "due": _field(c, "due", "sendung_in"), "length": _field(c, "duration", "laenge"),
                     "cutter": _field(c, "cutter", "editor"), "urgent": _field(c, "urgent") == "True",
                     "state": text, "pill": cls, "tags": tags(c), "handed": local_time(t) if t else "",
+                    "origin": str(_raw(c).get("schnittraum") or ""),
+                    "folder": origin_folder(c), "folder_down": bool(_raw(c).get(STALE)),
                     "group": c.show.strip() or "ohne Sendung"})
     return {"rows": out, "counts": {"list": len(contributions)},
             "order": order if order in ORDERS else "zeit"}
@@ -100,14 +116,20 @@ def tags(c: Contribution) -> list[str]:
         out.append("freigegeben")
     if c.mix.duplicate_of:
         out.append("Duplikat")
+    raw = _raw(c)
+    if raw.get("neue_uebergabe"):
+        out.append("neue Übergabe")
+    if int(raw.get("uebergabe_nr") or 1) > 1:
+        out.append(f"Fassung {raw['uebergabe_nr']}")
     return out
 
 
-def detail(c: Contribution, handover: Handover | None, mixer: str, room: str) -> dict:
-    """Detailbereich rechts: Kopf, Hinweise, Angaben, erlaubte Aktionen."""
+def detail(c: Contribution, handover: Handover | None, mixer: str, room: str, folder_mode: bool = False) -> dict:
+    """Detailbereich rechts: Kopf, Hinweise, Angaben, erlaubte Aktionen. `folder_mode`: Betriebsart Übergabeordner
+    (kein Duplizieren, keine Benachrichtigung)."""
     m = c.mix
     mine = is_mine(c, mixer, room)
-    banners = []
+    banners = folder_banners(c, mine) if folder_mode else []
     if m.state in mixstate.OWNED and not mine:
         since = f" seit {m.taken_at}" if m.taken_at else ""
         banners.append({"cls": "warn", "text": f"In Mischung bei {m.mixer or 'jemand'} in {m.room or '?'}{since}."})
@@ -133,7 +155,18 @@ def detail(c: Contribution, handover: Handover | None, mixer: str, room: str) ->
         ("Cutter", _field(c, "cutter", "editor")),
         ("Session", os.path.basename(m.session_path) if m.session_path else NONE),
     ]
-    takeable = m.state in mixstate.TAKEABLE and not c.locked
+    if folder_mode:
+        raw = _raw(c)
+        kv += [("Schnittraum", raw.get("schnittraum") or NONE), ("Filmordner", raw.get("ordner_name") or NONE),
+               ("Übergabe", f"{raw.get('uebergabe_text') or NONE} · Fassung {raw.get('uebergabe_nr') or 1}")]
+    stale = c.locked and mixstate.stale_lock(m)
+    if stale:                               # Jens 11.11.2026: Sperre ohne Besitzer darf übernommen werden
+        banners.append({"cls": "warn", "text": (
+            "Gesperrt, aber ohne Mischer (meist eine abgebrochene Übernahme). Übernehmen hebt die Sperre auf – vorher "
+            "im Raumstatus prüfen, ob dort jemand arbeitet." if folder_mode else
+            "In Helmut gesperrt, aber von keinem Mischer übernommen (meist eine abgebrochene Übernahme). Übernehmen "
+            "hebt die Sperre auf – weißt du nicht, warum gesperrt ist, erst in Helmut nachsehen.")})
+    takeable = m.state in mixstate.TAKEABLE and (not c.locked or stale)
     return {
         "id": c.id, "title": c.title, "show": c.show, "air": _field(c, "airDate", "sendetermin"),
         "banners": banners, "kv": [{"k": k, "v": v} for k, v in kv],
@@ -145,7 +178,7 @@ def detail(c: Contribution, handover: Handover | None, mixer: str, room: str) ->
             and m.state in (mixstate.IMPORTED, mixstate.MIXING, mixstate.EXPORTED, mixstate.DELIVERED)
             and bool(m.session_path),
             "release": m.state in mixstate.OWNED,
-            "duplicate": True,
+            "duplicate": not folder_mode,
             "backups": bool(m.session_path),
             "finder": bool(m.session_path),
         },
@@ -154,7 +187,7 @@ def detail(c: Contribution, handover: Handover | None, mixer: str, room: str) ->
                            "can_keep": bool(m.session_path),
                            "keep_default": bool(m.session_path) and m.state != mixstate.READY},
         "release_reasons": list(RELEASE_REASONS),
-        "release_info": release_info(c, mixer, room) if m.state in mixstate.OWNED else None,
+        "release_info": release_info(c, mixer, room, notify=not folder_mode) if m.state in mixstate.OWNED else None,
         "reopen": reopen_view(c) if takeable or (mine and m.state == mixstate.TAKEN) else None,
     }
 
@@ -182,7 +215,47 @@ def local_time(iso: str) -> str:
         return iso
 
 
-def release_info(c: Contribution, mixer: str, room: str) -> dict:
+def folder_banners(c: Contribution, mine: bool) -> list[dict]:
+    """Hinweise der Betriebsart Übergabeordner: Übergabe unvollständig, neue Fassung, verwaiste Sperre."""
+    raw, out = _raw(c), []
+    cut = f" ({raw['schnittraum']})" if raw.get("schnittraum") else ""
+    if raw.get("ordner_nicht_erreichbar"):
+        where = f"Der Übergabeordner „{raw['uebergabeordner']}“" if raw.get("uebergabeordner") else "Der Übergabeordner"
+        out.append({"cls": "warn", "text": f"{where} ist gerade nicht erreichbar – hier steht der zuletzt gelesene "
+                                           "Stand. Übernehmen und Zurückliefern gehen, sobald er wieder da ist."})
+    if raw.get("uebergabe") == "wird_uebertragen":
+        out.append({"cls": "warn", "text": "Wird noch übertragen. Übernehmen geht, sobald die Übergabe vollständig ist "
+                                           "– die Liste aktualisiert sich von selbst."})
+    if raw.get("uebergabe") == "unvollstaendig":
+        out.append({"cls": "warn", "text": "Übergabe unvollständig: " + "; ".join(raw.get("probleme") or []) +
+                                           f". Kommt nichts nach, beim Schnitt{cut} neu übergeben lassen."})
+    if raw.get("neue_uebergabe") and mine:
+        out.append({"cls": "warn", "text": new_handover_text(c)})
+    if raw.get("sperre_unlesbar"):
+        out.append({"cls": "warn", "text": "Die Sperrdatei im Filmordner ist nicht lesbar – vielleicht arbeitet dort "
+                                           "jemand. Erst im Raumstatus nachsehen; ist sicher niemand dran: Freigeben."})
+    elif raw.get("sperre_alt") and c.mix.state in mixstate.OWNED and not mine:
+        out.append({"cls": "warn", "text": "Seit Stunden keine Änderung an dieser Übernahme. Wird dort sicher nicht "
+                                           "mehr gearbeitet (vorher im Raum nachfragen): Freigeben."})
+    if raw.get("belegt_direkt"):
+        out.append({"cls": "info", "text": f"Gerade in {c.mix.room or 'einem anderen Raum'} von "
+                                           f"{c.mix.mixer or 'jemandem'} übernommen."})
+    return out
+
+
+def new_handover_text(c: Contribution) -> str:
+    """Neue Fassung während der Mischung (Betriebsart Übergabeordner) – für Detail und Zurückliefern."""
+    raw = _raw(c)
+    cut = f" ({raw['schnittraum']})" if raw.get("schnittraum") else ""
+    if raw.get("uebergabe") == "wird_uebertragen":
+        return (f"Der Schnitt{cut} überträgt gerade eine neue Fassung. Deine Session beruht auf Fassung "
+                f"{raw.get('gemischte_nr') or 1} – mit dem Schnitt klären, welche Fassung gesendet wird.")
+    return (f"Der Schnitt hat Fassung {raw.get('uebergabe_nr')} übergeben – deine Session beruht auf Fassung "
+            f"{raw.get('gemischte_nr') or 1}. Neue Fassung ins Projekt holen oder mit dem Schnitt{cut} klären, welche "
+            "Fassung gesendet wird.")
+
+
+def release_info(c: Contribution, mixer: str, room: str, notify: bool = True) -> dict:
     """Freigeben-Dialog: Wahl fürs nächste Öffnen, Warnung bei fremdem Raum, wer benachrichtigt wird."""
     m = c.mix
     here = m.room == room
@@ -200,7 +273,7 @@ def release_info(c: Contribution, mixer: str, room: str) -> dict:
     warn = "" if here and m.mixer == mixer else (
         f"„{c.title}“ ist in {m.room or '?'} bei {m.mixer or 'jemand'} übernommen. Nur freigeben, wenn dort "
         "sicher nicht mehr gearbeitet wird.")
-    who = [n for n in (m.mixer, _field(c, "cutter", "editor")) if n and n != NONE]
+    who = [n for n in (m.mixer, _field(c, "cutter", "editor")) if n and n != NONE] if notify else []
     return {"keep": [{"value": k, "label": labels[k]} for k in keep], "keep_default": keep[0],
             "keep_hint": hint, "warn": warn, "notify": who}
 

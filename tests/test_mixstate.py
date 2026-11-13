@@ -20,9 +20,9 @@ def test_fremd_uebernommen_ist_konflikt():
         check_take(FREMD, locked=True, mixer="Jens", room="Ton 3")
 
 
-def test_gesperrt_ohne_eintrag_ist_konflikt():
-    with pytest.raises(ConflictError):
-        check_take(FREI, locked=True, mixer="Jens", room="Ton 3")
+def test_gesperrt_ohne_eintrag_ist_kein_konflikt_mehr():
+    """Früher Konflikt; Jens 11.11.2026: Sperre ohne Besitzer darf übernommen werden (siehe unten)."""
+    check_take(FREI, locked=True, mixer="Jens", room="Ton 3")
 
 
 def test_erneut_uebernehmen_durch_denselben_ist_kein_konflikt():
@@ -51,3 +51,24 @@ def test_nicht_uebernommen_kann_nicht_zurueckgegeben_werden():
 def test_unbekannter_zustand():
     with pytest.raises(ValueError):
         with_state(MEINER, "fertig")
+
+
+def test_sperre_ohne_besitzer_darf_uebernommen_werden():
+    """Jens 11.11.2026: gesperrt, aber niemandem zugeordnet (Sperre kam an, Antwort nicht) – übernehmen erlauben."""
+    check_take(FREI, locked=True, mixer="Jens", room="Ton 3")
+    check_take(MixState(state="zurueckgegeben"), locked=True, mixer="Jens", room="Ton 3")   # Freigeben leert Mischer
+    for mixer in ("A. Wolf", "Jens"):        # „ausgeliefert“ mit Mischer bleibt gesperrt (z. B. Cutter sperrt danach)
+        with pytest.raises(ConflictError, match=mixer):
+            check_take(MixState(state="ausgeliefert", mixer=mixer, room="Ton 3"), locked=True, mixer="Jens",
+                       room="Ton 3")
+
+
+def test_havarie_blocker():
+    from tonmischung.core.mixstate import havarie_blocker
+    assert havarie_blocker(FREI, "Jens", "Ton 3") == ""
+    assert "schon normal übernommen" in havarie_blocker(MEINER, "Jens", "Ton 3")
+    assert havarie_blocker(MEINER, "Jens", "Ton 3", replay=True) == ""             # eigene, schon angekommene
+    assert "A. Wolf" in havarie_blocker(FREMD, "Jens", "Ton 3", replay=True)
+    eigen = MixState(state="ausgeliefert", mixer="Jens", room="Ton 3")
+    assert havarie_blocker(eigen, "Jens", "Ton 3") == ""                           # gestern selbst ausgeliefert
+    assert "ausgeliefert" in havarie_blocker(MixState(state="ausgeliefert", mixer="B", room="Ton 2"), "Jens", "Ton 3")

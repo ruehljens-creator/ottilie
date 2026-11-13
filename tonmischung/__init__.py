@@ -2,4 +2,4 @@
 
 # Version: v0.x in der Erprobung; je ausgeliefertem Paket ein Git-Tag „v<Version>“ und ein Release mit dem DMG
 # (CHANGELOG.md). Einzige Quelle – Paketname, Info.plist, „Über Ottilie“ und Bauangabe lesen sie hier.
-__version__ = "0.1"
+__version__ = "0.3"

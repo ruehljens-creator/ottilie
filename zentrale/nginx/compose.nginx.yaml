@@ -1,0 +1,17 @@
+# Variante 2: Zentrale und nginx als zwei Container (nicht nötig auf dem Testserver).
+#   docker compose -f compose.yaml -f nginx/compose.nginx.yaml up -d
+# Zertifikat nach nginx/tls/zentrale.crt und .key legen; nginx/zentrale.conf: proxy_pass http://zentrale:8470;
+services:
+  nginx:
+    image: nginx:1.26-bookworm
+    container_name: ottilie-zentrale-nginx
+    restart: unless-stopped
+    depends_on: [zentrale]
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/zentrale.conf:/etc/nginx/conf.d/zentrale.conf:ro
+      - ./nginx/tls:/etc/nginx/tls:ro
+  zentrale:
+    environment:
+      ZENTRALE_PROXY: "172.16.0.0/12"   # Docker-Netz von nginx (nie „*“)

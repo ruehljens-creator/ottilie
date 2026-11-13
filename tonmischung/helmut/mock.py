@@ -5,7 +5,9 @@ Projektstatus als Objekt, Metadaten mit Set-Verweis
 (`parent`), Assets mit `filepath`/`mimeType`/`customMetadata`, Token im Header.
 Falsch geformte Anfragen lehnt er mit 400 ab, damit Formatfehler in Tests auffallen.
 Fehler lassen sich einspielen: `unavailable` (503), `fail_next` (Statuscodes),
-`late_next` (Sekunden: Anfrage wird ausgeführt, die Antwort kommt verspätet), `expire_tokens()` (401 → Neuanmeldung).
+`late_next` (Sekunden: Anfrage wird ausgeführt, die Antwort kommt verspätet), `expire_tokens()` (401 → Neuanmeldung),
+`notify_denied` (Statuscode für Benachrichtigungen an andere – laut OpenAPI dürfen das nur Admins; welchen Code das
+echte Helmut schickt, ist offen).
 
 Einzeln starten:  python -m tonmischung.helmut.mock --port 8765   (Anmeldung test / test)
 """
@@ -39,6 +41,7 @@ class MockHelmut:
         self.unavailable = False
         self.fail_next: list[int] = []
         self.late_next: list[float] = []
+        self.notify_denied: int | None = None      # z. B. 401/403: Konto ohne Admin-Rolle
         self._lock = threading.Lock()
         self._server: ThreadingHTTPServer | None = None
 
@@ -167,6 +170,8 @@ class MockHelmut:
             return self._login(ok, query)
         if not auth.startswith("Bearer ") or auth[7:] not in self.tokens:
             return 401, {"error": "nicht angemeldet"}, None
+        if method == "GET" and path == "/v1/members/auth/whoami":
+            return 200, {"username": "ottilie"}, None
 
         if method == "POST" and path == "/v1/fx/projects/search":
             if (body or {}).get("type") != "FX" or not isinstance((body or {}).get("filter"), list):
@@ -226,6 +231,8 @@ class MockHelmut:
         if method == "POST" and m:
             if not isinstance((body or {}).get("msg"), str):
                 return 400, {"error": "Message erwartet (msg)"}, None
+            if self.notify_denied:
+                return self.notify_denied, {"error": "nur Admins benachrichtigen andere"}, None
             self.notifications.append((m.group(1), body))
             return 200, {"username": m.group(1)}, None
         return 404, {"error": f"{method} {path} nicht im Mock"}, None

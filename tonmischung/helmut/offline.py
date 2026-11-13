@@ -7,13 +7,12 @@ die Einträge, bis die Havarie-Session einem Beitrag zugeordnet ist.
 """
 from __future__ import annotations
 
-import os
 
 from tonmischung.core import mixstate
 from tonmischung.core.catchup import CatchUpQueue
 from tonmischung.core.havarie import Package
 from tonmischung.core.mixstate import MixState
-from tonmischung.helmut.mapping import Asset, Contribution, Handover
+from tonmischung.helmut.mapping import Contribution, Handover, handover_from_paths
 
 HINT = ("Havarie: ohne Helmut geöffnet – Übernahme und Zustand werden nachgetragen, sobald Helmut wieder da ist"
         "{zuordnen}")
@@ -27,11 +26,7 @@ class _OfflineClient:
         return self.s.contribution
 
     def handover(self, project_id: str) -> Handover:
-        p = self.s.package
-
-        def asset(path: str) -> Asset | None:
-            return Asset("", os.path.basename(path), path) if path else None
-        return Handover(asset(p.aaf), asset(p.video), None)
+        return handover_from_paths(self.s.package.aaf, self.s.package.video)
 
 
 class OfflineService:

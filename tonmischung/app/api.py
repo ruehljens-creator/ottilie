@@ -37,7 +37,7 @@ class ApiCommand:
 
 CATALOG: tuple[ApiCommand, ...] = (
     ApiCommand("status", READ, "Pro Tools (offene Session), Helmut, Mischer und Raum", "status",
-               result="version, pro_tools {ok, session}, helmut {ok, mock}, mixer, room"),
+               result="version, pro_tools {ok, session}, helmut {ok, mock}, betriebsart, mixer, room"),
     ApiCommand("beitraege", READ, "Beiträge „Zur Mischung“ (eigene mit Plakette „meine Mischung · …“)", "list",
                {"query": "Suchtext (Titel, Sendung)", "order": "zeit (Standard) oder sendung"},
                "rows [{id, title, show, state, pill …}], counts {list}"),
@@ -54,15 +54,22 @@ CATALOG: tuple[ApiCommand, ...] = (
     ApiCommand("pro_tools", READ, "Pro Tools abfragen (nur lesen): Transport, Spuren, Session, Auswahl, Marker",
                "pro_tools", {"was": "transport | spuren | session | auswahl | marker"},
                "je nach Abfrage, z. B. transport oder spuren [{name, typ, clips, format}]"),
+    ApiCommand("zentrale", READ, "Zentrale: Adresse, Verbindung, Kopplung (ohne Schlüssel), zentral vorgegebene "
+               "Einstellungen", "zentrale", result="adresse, zustand, text, verbunden, gekoppelt, raum_zentrale, "
+               "zentral_vorgegeben"),
+    ApiCommand("uebergabeordner", READ, "Betriebsart und Übergabeordner: erreichbar, beschreibbar, Filme",
+               "uebergabeordner", result="betriebsart, ordner, erreichbar, beschreibbar, meldung, filme {bereit, "
+                                         "unvollstaendig, wird_uebertragen}, fertigmeldung {aktiv, url}"),
     ApiCommand("zurueckliefern_info", READ, "Übersicht vor dem Zurückliefern", "zurueckliefern_info",
-               {"id": "Projekt-ID"}, "session, tracks, missing, target, lufs, truepeak"),
+               {"id": "Projekt-ID"}, "session, tracks, missing, target, lufs, truepeak, videoid"),
     ApiCommand("holen", CHANGE, "Beitrag übernehmen und in Pro Tools importieren (mit AAF-Triage). "
                "Fragen (offene Session, Vorschau) erscheinen im Fenster beim Mischer.", "holen",
                {"id": "Projekt-ID", "group": "Templategruppe", "name": "Template", "triage": "true/false",
                 "video": "Referenzvideo importieren, true/false"}, "Auftrag (siehe auftrag)"),
-    ApiCommand("zurueckliefern", CHANGE, "Mischung zurückliefern: konsolidieren, R128, WAVs an Helmut",
-               "zurueckliefern",
-               {"id": "Projekt-ID", "tracks": "Exportspuren, kommagetrennt (sonst Spurtabelle)"}, "Auftrag"),
+    ApiCommand("zurueckliefern", CHANGE, "Mischung zurückliefern: konsolidieren, R128, WAVs und Metadaten-Datei "
+               "an Helmut", "zurueckliefern",
+               {"id": "Projekt-ID", "tracks": "Exportspuren, kommagetrennt (sonst Spurtabelle)",
+                "videoid": "VideoID (ohne Angabe bleibt die in Helmut)"}, "Auftrag"),
     ApiCommand("freigeben", CHANGE, "Übernahme aufheben (Zurückgeben)", "release",
                {"id": "Projekt-ID", "reason": " | ".join(RELEASE_REASONS)},
                "Beitrag wie bei beitrag"),
@@ -103,8 +110,6 @@ CATALOG += (
                types={"sekunden": "float"}, timeout_s=70),
     ApiCommand("raeume", READ, "Raumübersicht: je Raum Nutzer, Mischer, Zustand, Beitrag, Fortschritt", "raeume",
                result="cards [{name, here, st, label, user, title, pct, online}], busy, source"),
-    ApiCommand("raumliste", READ, "Raumliste (Raum ↔ Mac) und die Macs zur Auswahl", "raumliste",
-               result="rooms [{id, name, rechnername}], macs, this_mac, this_room, ablage"),
     ApiCommand("nutzer", READ, "Nutzer, angemeldeter Nutzer und Standard-Nutzer dieses Macs", "nutzer",
                result="users [{id, name}], current, standard, ablage, needs_login"),
     ApiCommand("vorlagen", READ, "„Meine Templates“ des angemeldeten Nutzers mit Standard und gefundenen Templates",
@@ -114,9 +119,6 @@ CATALOG += (
                "Geräteverwaltung, Hausstandard), Sperre, Auswahl", "einstellungen_abschnitt",
                {"id": "Abschnitt, z. B. export.spuren_lautheit"},
                "title, groups [{fields [{path, label, value, source, locked, options}]}]", required=("id",)),
-    ApiCommand("einstellungen_import_pruefen", READ, "Einstellungsdatei lesen und zeigen, was übernommen würde (ändert "
-               "nichts)", "einstellungen_import_pruefen", {"pfad": "Pfad der .json"}, "path, choices, unknown",
-               required=("pfad",)),
     ApiCommand("spurprofile", READ, "Spurprofile je Template", "spurprofile", {"gruppe": _G, "name": _N},
                "templates, chosen, selected (Zeilen, Probleme, Schalter), session, columns"),
     ApiCommand("spurprofile_import_pruefen", READ, "Spurprofil-Datei lesen und zeigen, was übernommen würde",
@@ -211,13 +213,6 @@ CATALOG += (
                "Feld mit value, source, errors", types={"value": "any"}, required=("path", "value")),
     ApiCommand("einstellung_zuruecksetzen", ADMIN, "Eine Einstellung auf den geerbten Wert zurücksetzen",
                "einstellung_zuruecksetzen", {"path": "Pfad"}, "Feld", required=("path",)),
-    ApiCommand("einstellungen_exportieren", ADMIN,
-               "Geänderte Einstellungen in eine Datei schreiben (nie überschreiben)",
-               "einstellungen_exportieren", {"ziel": "Ordner oder .json-Pfad"}, "message, path", required=("ziel",)),
-    ApiCommand("einstellungen_importieren", ADMIN, "Einstellungen aus einer Datei übernehmen (Auswahl aus "
-               "einstellungen_import_pruefen)", "einstellungen_importieren",
-               {"pfad": "Pfad der .json", "auswahl": "Liste der Schlüssel"}, "message", types={"auswahl": "list"},
-               required=("pfad", "auswahl")),
     ApiCommand("nutzer_anlegen", ADMIN, "Nutzer anlegen (startet mit dem Hausstandard)", "nutzer_anlegen",
                {"name": "Name"}, "users, message", required=("name",)),
     ApiCommand("nutzer_umbenennen", ADMIN, "Nutzer umbenennen", "nutzer_umbenennen",
@@ -230,9 +225,6 @@ CATALOG += (
                "nutzer_anmelden",
                {"id": "Nutzer-ID", "standard": "auch als Standard-Nutzer dieses Macs, true/false"}, "users, current",
                types={"standard": "bool"}, required=("id",)),
-    ApiCommand("raumliste_speichern", ADMIN, "Raumliste speichern (Raum ↔ Mac)", "raumliste_speichern",
-               {"rooms": "Liste [{name, rechnername, id_code}]"}, "rooms, message, errors", types={"rooms": "list"},
-               required=("rooms",)),
     ApiCommand("vorlage_hochladen", ADMIN, "Pro-Tools-Template (.ptxt oder Ordner mit Video Files) zu „Meine "
                "Templates“ hochladen und in Pro Tools bereitstellen", "vorlage_hochladen",
                {"path": "Pfad der .ptxt oder des Ordners"},
@@ -284,7 +276,10 @@ CATALOG += (
 # Helmut-Adresse und Werkzeugpfaden, Webtrigger (Netz, Schlüssel). Sonst könnte sich ein Werkzeug mit „verwalten“
 # selbst mehr Rechte geben, den Webtrigger ins Netz öffnen oder Zugangsdaten umleiten. Die Transferziele kommen dazu,
 # sobald sie wirken (heute ausgeblendet).
-PROTECTED_SETTINGS = ("system.schnittstellen.", "system.streamdeck_webtrigger.")
+# Dazu der gemeinsame Datenordner (Sicherheit 13.11.2026: ein Pfad wie „~“ legte Nachtrag und Sperrdateien in den
+# Benutzerordner).
+PROTECTED_SETTINGS = ("system.schnittstellen.", "system.streamdeck_webtrigger.", "system.uebergabeordner.",
+                      "system.raeume_nutzer.datenordner")
 
 
 def protected_setting(path: str) -> bool:
@@ -296,11 +291,19 @@ WINDOW_ONLY: dict[str, str] = {
     "ordner_waehlen": "öffnet einen Auswahldialog auf dem Bildschirm (über die Schnittstelle: Pfad angeben)",
     "im_finder": "öffnet den Finder", "link_oeffnen": "öffnet den Browser",
     "ready": "meldet das Fenster bereit (intern)", "auswahl": "Auswahl im Fenster (für den Webtrigger /import)",
-    "kopieren": "Zwischenablage des Fensters",
+    "kopieren": "Zwischenablage des Fensters", "videoid_einfuegen": "liest die Zwischenablage dieses Macs",
     "webtrigger_adressen": "enthält den Webtrigger-Schlüssel – der geht nie an KI-Assistenten",
     "id_code_erzeugen": "antwortet mit den Webtrigger-Adressen samt Schlüssel",
     "id_code_entfernen": "antwortet mit den Webtrigger-Adressen samt Schlüssel",
     "launcher_erzeugen": "legt Startprogramme an und öffnet den Finder",
+    "fertigmeldung_testen": "sendet an den eingestellten Dienst, mit Anmeldung aus dem Schlüsselbund – löst nur ein "
+                            "Mensch im Einstellungsfenster aus",
+    "zentrale_koppeln": "legt die Kopplung rechnerweit ab (Administrator-Dialog) – nur ein Mensch am Mac",
+    "zentrale_anmelden": "legt die Anmeldung rechnerweit ab (Administrator-Dialog) – nur ein Mensch am Mac",
+    "zentrale_neu_verbinden": "Verbindung zur Zentrale neu aufbauen (Knopf im Fenster)",
+    "chat": "Chat der Zentrale – Inhalte gehen nie an Schnittstellen oder KI-Assistenten",
+    "chat_senden": "Chat der Zentrale – nur Menschen schreiben", "chat_gelesen": "Chat der Zentrale (Lesestand)",
+    "chat_oeffnen": "Chat der Zentrale – nur Menschen öffnen Gespräche",
 }
 
 BY_NAME = {c.name: c for c in CATALOG}
@@ -344,8 +347,6 @@ class ApiDispatcher:
                     and protected_setting(str(args.get("path") or ""))):
                 raise CommandError(f"„{args.get('path')}“ lässt sich nur im Fenster ändern (Rechte, Webtrigger, "
                                    "Helmut-Adresse, Werkzeuge)")
-            if name == "einstellungen_importieren":
-                args["_ohne_geschuetzte"] = True           # geschützte Werte der Datei bleiben unberücksichtigt
         rights = rights_for(origin, self._settings)
         missing = [a for a in cmd.required if (args or {}).get(a) in (None, "", [])]
         if missing and origin != "fenster":
@@ -362,7 +363,26 @@ class ApiDispatcher:
                                "(Einstellung system.schnittstellen.mcp_antworten_erlaubt)")
         if cmd.kind in (CHANGE, ADMIN):
             log.info("API %s über %s: %s", name, origin, {k: v for k, v in (args or {}).items()})
-        return self._call(cmd.handler, args)
+        result = self._call(cmd.handler, args)
+        if origin != "fenster" and name == "einstellungen_abschnitt":
+            result = redact_section(result)
+        return result
+
+
+# Einstellungen, deren Wert ein Geheimnis tragen kann (Schlüssel in der Adresse eines Webhooks): über Socket und MCP
+# nur gekürzt (Sicherheit 11.11.2026)
+SECRET_URLS = ("system.uebergabeordner.fertigmeldung.url",)
+
+
+def redact_section(view: Any) -> Any:
+    from tonmischung.dropfolder.notify import shown_url
+    if not isinstance(view, dict):
+        return view
+    for group in view.get("groups") or []:
+        for f in group.get("fields") or []:
+            if f.get("path") in SECRET_URLS and f.get("value"):
+                f["value"] = shown_url(str(f["value"]))
+    return view
 
 
 KIND_TITLES = {READ: "Lesen", CHANGE: "Arbeitsabläufe (ändern)", ADMIN: "Verwalten"}
@@ -396,7 +416,7 @@ def markdown() -> str:
              "(Standard: aus)",
              "- **Nur im Fenster änderbar** (über Socket und MCP gesperrt, beim Einstellungsimport übergangen): "
              + ", ".join(f"`{p}…`" if p.endswith(".") else f"`{p}`" for p in PROTECTED_SETTINGS)
-             + " – Rechte der Schnittstellen, Helmut-Adresse, Werkzeuge, Webtrigger.",
+             + " – Rechte der Schnittstellen, Helmut-Adresse, Werkzeuge, Webtrigger, Betriebsart und Fertigmeldung.",
              "- Die Stufen schützen vor ungewollten Aktionen über MCP-Werkzeuge; sie sind keine Grenze gegen "
              "Programme, die unter demselben Benutzer selbst den Socket ansprechen.",
              "", f"{len(CATALOG)} Befehle: "

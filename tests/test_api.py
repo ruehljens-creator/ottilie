@@ -201,19 +201,6 @@ def test_drei_stufen_fuer_mcp(app):
     assert api.dispatch("ping", {}, "mcp")["pong"] is True
 
 
-def test_pfad_statt_dialog(app, tmp_path):
-    bridge, api, settings = app
-    with pytest.raises(CommandError, match="Angabe fehlt: ziel"):
-        api.dispatch("einstellungen_exportieren", {}, "socket")               # nie ein Dateidialog
-    with pytest.raises(CommandError, match="Angabe fehlt: pfad"):
-        api.dispatch("einstellungen_import_pruefen", {}, "socket")
-    settings.set_local("persoenlich.farbschema", "kontrast")
-    out = api.dispatch("einstellungen_exportieren", {"ziel": str(tmp_path)}, "socket")
-    assert out["path"].startswith(str(tmp_path)) and Path(out["path"]).is_file()
-    check = api.dispatch("einstellungen_import_pruefen", {"pfad": out["path"]}, "socket")
-    assert check["path"] == out["path"] and check["choices"]
-
-
 def test_auftrag_warten():
     from tonmischung.app.commands import wait_for_job
     snaps = iter([{"id": 1, "state": "laeuft", "step": "a", "fraction": 0.1}] * 3 +
@@ -273,16 +260,6 @@ def test_geschuetzte_einstellungen_nur_im_fenster(app, tmp_path):
             with pytest.raises(CommandError, match="nur im Fenster"):
                 api.dispatch("einstellung_setzen", {"path": path, "value": True}, origin)
     assert not protected_setting("persoenlich.farbschema")
-    datei = tmp_path / "e.json"
-    import json as _j
-    from tonmischung.core import settings_transfer as ST
-    datei.write_text(_j.dumps(ST.export_document({"system.schnittstellen.mcp_antworten_erlaubt": True,
-                                                  "persoenlich.farbschema": "kontrast"}, "jetzt", "test")))
-    choices = api.dispatch("einstellungen_import_pruefen", {"pfad": str(datei)}, "mcp")["choices"]
-    out = api.dispatch("einstellungen_importieren", {"pfad": str(datei), "auswahl": [c["id"] for c in choices]}, "mcp")
-    assert "nur im Fenster" in out["message"]
-    assert settings.get("system.schnittstellen.mcp_antworten_erlaubt") is False
-    assert settings.get("persoenlich.farbschema") == "kontrast"
     settings.set_local("system.schnittstellen.mcp_aktiv", False)                       # wirkt sofort
     with pytest.raises(CommandError, match="abgeschaltet"):
         api.dispatch("ping", {}, "mcp")

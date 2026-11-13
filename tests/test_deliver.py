@@ -14,6 +14,7 @@ from tonmischung.ptsl.errors import PtslError
 from tonmischung.sessions import pt_export
 from tonmischung.sessions.pt_export import ExportError, run_pt_export, wait_for_consolidated
 from tonmischung.workflow.deliver import copy_atomic, deliver
+from tonmischung.core import mixstate
 from tonmischung.workflow.fetch import FetchError
 
 WAIT = {"stable_s": 0, "poll_s": 0, "sleep": lambda s: None}
@@ -244,7 +245,8 @@ def test_zurueckliefern(mock, tmp_path):
     r = _deliver(mock, e, tmp_path)
     assert len(r.delivered) == 5 and all(p.endswith(".wav") for p in r.delivered)   # leere Spr dabei
     assert all(os.path.dirname(os.path.dirname(p)) == str(tmp_path / "helmut" / "p1") for p in r.delivered)
-    assert len(mock.assets["p1"]) == 5
+    assert [a["mimeType"] for a in mock.assets["p1"]] == ["AUDIO"] * 5 + ["DATA"]        # zuletzt die Metadaten
+    assert mock.assets["p1"][-1]["filepath"] == r.metadata and r.metadata.endswith("p1_metadaten.json")
     assert mock.mix_value("p1", "zustand") == "ausgeliefert"
     assert not any(f.endswith(".part") for _, _, fs in os.walk(tmp_path / "helmut") for f in fs)
 
@@ -349,7 +351,7 @@ def test_zurueckliefern_meldet_alle_schritte(mock, tmp_path):
         if not schritte or schritte[-1] != name:
             schritte.append(name)
     assert schritte == ["Session vorbereiten", "Kürzen und einblenden", "Konsolidieren", "Lautheit",
-                        "WAVs kopieren", "An Helmut übergeben", "Fertig"]
+                        "WAVs kopieren", "Übergeben", "Fertig"]
     werte = [w for w, _ in a.werte]
     assert werte == sorted(werte) and werte[-1] == 1.0          # nur vorwärts
     assert any("ST: " in t for _, t in a.werte)                   # Zwischenschritte der Lautheit
@@ -398,3 +400,260 @@ def test_programmbeginn_aus_der_einstellung(tmp_path, monkeypatch):
         run_pt_export(PtslClient(engine_factory=lambda: _engine(tmp_path)), ["ST"], str(tmp_path / "out"),
                       loudness_tracks=[], program_start="09:59:30:00")
     assert seen == ["09:59:30:00.00"] and pt_export.with_subframes("10:00:00:00.12") == "10:00:00:00.12"
+
+
+# ── Metadaten-Datei und VideoID (Jens 10.11.2026) ────────────────────────────
+TABLE = [{"pt_spur": t, "inhalt": i, "export": True} for t, i in
+         [("ST", "Sendeton"), ("IT", "IT"), ("", "AD"), ("OGA", "OGA"), ("Mus", "Musik")]]
+
+
+def test_metadaten_datei_neben_den_wavs(mock, tmp_path):
+    import json
+    mock.add_project("p1", "Bahnstreik", "Heimatjournal", state="in_mischung", mischer="Jens", raum="Ton 3",
+                     session_pfad=str(tmp_path / "Bahnstreik" / "Bahnstreik.ptx"),
+                     assets=["/H/p1/Bahnstreik.aaf", "/H/p1/Bahnstreik.mxf"])
+    r = _deliver(mock, _engine(tmp_path), tmp_path, video_id=" VID-0142\n", track_table=TABLE)
+    assert os.path.dirname(r.metadata) == os.path.dirname(r.delivered[0])
+    d = json.loads(open(r.metadata, encoding="utf-8").read())
+    assert [(a["spur"], a["kanaele"]) for a in d["audio"]] == [
+        ("ST", [1, 2]), ("IT", [3, 4]), ("OGA", [7, 8]), ("Mus", [9, 10]), ("Spr", [])]
+    assert all(os.path.isfile(a["pfad"]) and os.path.basename(a["pfad"]) == a["datei"] for a in d["audio"])
+    assert d["video"]["pfad"] == "/H/p1/Bahnstreik.mxf" and d["videoid"] == "VID-0142"
+    assert d["bmx"]["clip"] == "VID-0142 Bahnstreik"
+    assert mock.mix_value("p1", "videoid") == "VID-0142"                 # Feld im Set „Mischung“
+    assert not any("Video" in w for w in r.warnings)
+
+
+def test_ohne_angabe_bleibt_die_videoid_aus_helmut(mock, tmp_path):
+    import json
+    mock.add_project("p1", "Bahnstreik", "Heimatjournal", state="in_mischung", mischer="Jens", raum="Ton 3",
+                     session_pfad=str(tmp_path / "Bahnstreik" / "Bahnstreik.ptx"), videoid="VID-ALT")
+    r = _deliver(mock, _engine(tmp_path), tmp_path)
+    assert json.loads(open(r.metadata, encoding="utf-8").read())["videoid"] == "VID-ALT"
+    assert mock.mix_value("p1", "videoid") == "VID-ALT"
+    assert any("fehlt nur der Videopfad" in w for w in r.warnings)
+
+
+def test_unzulaessige_videoid_vor_pro_tools(mock, tmp_path):
+    from tonmischung.delivery.manifest import VideoIdError
+    e = _engine(tmp_path)
+    with pytest.raises(VideoIdError):
+        _deliver(mock, e, tmp_path, video_id="VID\n2")
+    assert e.calls == [] and mock.mix_value("p1", "zustand") == "in_mischung"
+
+
+def test_helmut_weg_metadaten_und_videoid_werden_nachgetragen(mock, tmp_path):
+    from tonmischung.core.catchup import CatchUpQueue
+    e = _engine(tmp_path)
+    queue = CatchUpQueue(str(tmp_path / "nachtrag.json"))
+    svc = MixService(HelmutClient(mock.url, lambda: ("test", "test"), sleep=lambda s: None),
+                     "Jens", "Ton 3", now=lambda: "jetzt", queue=queue)
+    real = svc.client.handover
+
+    def gone(pid):
+        mock.unavailable = True                  # Helmut fällt nach den WAVs aus
+        return real(pid)
+    svc.client.handover = gone
+    r = deliver("p1", service=svc, ptsl=PtslClient(engine_factory=lambda: e), export_tracks=EXPORT,
+                loudness_tracks=["ST"], handover_root=str(tmp_path / "helmut" / "{projektId}"), video_id="VID-9")
+    assert os.path.isfile(r.metadata)            # Datei liegt trotzdem im Übergabeordner
+    assert any("fehlt nur der Videopfad" in w for w in r.warnings)
+    assert ("asset", "metadaten") in [(x.kind, x.asset_kind) for x in queue.pending()]
+    mix = next(x for x in queue.pending() if x.kind == "mischung")
+    assert mix.changes["video_id"] == "VID-9" and mix.changes["state"] == "ausgeliefert"
+
+
+def test_metadaten_scheitert_nichts_in_helmut(mock, tmp_path, monkeypatch):
+    """Ausfall: Platte voll beim JSON – vorher ist in Helmut nichts angemeldet, also keine Doppelten."""
+    from tonmischung.workflow import deliver as D
+
+    def full(path, write):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(D, "write_new", full)
+    with pytest.raises(FetchError, match="nichts an Helmut übergeben; die WAVs liegen in"):
+        _deliver(mock, _engine(tmp_path), tmp_path)
+    assert mock.assets["p1"] == [] and mock.mix_value("p1", "zustand") == "in_mischung"
+
+
+def test_metadaten_asset_abgelehnt_trotzdem_ausgeliefert(mock, tmp_path):
+    svc = MixService(HelmutClient(mock.url, lambda: ("test", "test"), sleep=lambda s: None), "Jens", "Ton 3",
+                     now=lambda: "jetzt")
+    real = svc.client.add_asset
+
+    def reject(pid, path, kind):
+        if kind == "metadaten":
+            mock.fail_next = [400]
+        return real(pid, path, kind)
+    svc.client.add_asset = reject
+    r = deliver("p1", service=svc, ptsl=PtslClient(engine_factory=lambda: _engine(tmp_path)), export_tracks=EXPORT,
+                loudness_tracks=["ST"], handover_root=str(tmp_path / "helmut" / "{projektId}"))
+    assert mock.mix_value("p1", "zustand") == "ausgeliefert" and len(mock.assets["p1"]) == 5
+    assert any("Metadaten-Datei nicht angenommen" in w for w in r.warnings) and os.path.isfile(r.metadata)
+
+
+def _queued_service(mock, tmp_path):
+    from tonmischung.core.catchup import CatchUpQueue
+    queue = CatchUpQueue(str(tmp_path / "nachtrag.json"))
+    return MixService(HelmutClient(mock.url, lambda: ("test", "test"), sleep=lambda s: None), "Jens", "Ton 3",
+                      now=lambda: "jetzt", queue=queue), queue
+
+
+def _run(svc, tmp_path, e=None, **kw):
+    return deliver("p1", service=svc, ptsl=PtslClient(engine_factory=lambda: e or _engine(tmp_path)),
+                   export_tracks=EXPORT, loudness_tracks=["ST"],
+                   handover_root=str(tmp_path / "helmut" / "{projektId}"), **kw)
+
+
+def test_alter_nachtrag_wird_vor_der_neuen_lieferung_geschrieben(mock, tmp_path):
+    """Ausfall: Wartet noch eine alte Lieferung, wird sie zuerst geschrieben – kein Überholen."""
+    svc, queue = _queued_service(mock, tmp_path)
+    queue.add_asset("p1", "Bahnstreik", "/alt/ST.wav", "tonspur")
+    r = _run(svc, tmp_path, video_id="VID-NEU")
+    assert mock.assets["p1"][0]["filepath"] == "/alt/ST.wav" and mock.assets["p1"][-1]["filepath"] == r.metadata
+    assert not queue.pending() and not r.queued and mock.mix_value("p1", "videoid") == "VID-NEU"
+
+
+def test_konflikt_im_nachtrag_haelt_vor_pro_tools_an(mock, tmp_path):
+    """Runde 2, N1: Bei einem Konflikt würde eine neue Lieferung nie ankommen – deshalb vorher klar abbrechen."""
+    from tonmischung.core.mixstate import ConflictError
+    svc, queue = _queued_service(mock, tmp_path)
+    from tonmischung.core.catchup import CONFLICT
+    queue.mark(queue.add_lock("p1", "Bahnstreik", False), CONFLICT, "inzwischen bei A. Wolf")
+    e = _engine(tmp_path)
+    with pytest.raises(ConflictError, match="Konflikt im Nachtrag"):
+        _run(svc, tmp_path, e=e)
+    assert e.calls == [] and mock.assets["p1"] == []
+
+
+def test_uebernehmen_traegt_alte_lieferung_erst_nach(mock, tmp_path):
+    """Runde 2, N3: Eingereihtes „ausgeliefert“ darf einen neu geholten Beitrag nicht später entsperren."""
+    svc, queue = _queued_service(mock, tmp_path)
+    c = svc.client.get("p1")
+    queue.add_mix("p1", "Bahnstreik", c.mix, mixstate.after_delivery(c.mix), "Jens", "Ton 3")
+    queue.add_lock("p1", "Bahnstreik", False)
+    svc.take("p1")                                       # trägt erst nach, dann übernimmt
+    assert not queue.pending()
+    assert mock.mix_value("p1", "zustand") == "uebernommen" and mock.status("p1") == "LOCKED"
+
+
+def test_ausfall_mitten_in_der_lieferung_haelt_die_reihenfolge(mock, tmp_path):
+    """Fällt Helmut beim ersten WAV aus, kommt alles dahinter – „ausgeliefert“ vor der Metadaten-Datei."""
+    from tonmischung.helmut.catchup import replay
+    svc, queue = _queued_service(mock, tmp_path)
+    real = svc.client.add_asset
+    calls = []
+
+    def flaky(pid, path, kind):
+        calls.append(path)
+        if len(calls) == 1:
+            mock.unavailable = True
+            try:
+                return real(pid, path, kind)
+            finally:
+                mock.unavailable = False
+        return real(pid, path, kind)
+    svc.client.add_asset = flaky
+    r = _run(svc, tmp_path, video_id="VID-1")
+    assert r.queued and len(calls) == 1 and mock.assets["p1"] == []
+    assert [(e.kind, e.asset_kind) for e in queue.pending()] == [("asset", "tonspur")] * 5 + [
+        ("mischung", ""), ("sperre", ""), ("asset", "metadaten")]
+    assert sum(w.startswith("Helmut ist nicht erreichbar") for w in r.warnings) == 1
+    svc.client.add_asset = real
+    replay(queue, svc.client)
+    assert mock.assets["p1"][-1]["filepath"] == r.metadata and mock.mix_value("p1", "zustand") == "ausgeliefert"
+
+
+def test_kopierfehler_raeumt_eigene_hilfsdatei_weg(tmp_path):
+    src = tmp_path / "ST.wav"
+    src.write_bytes(b"x" * 100)
+
+    def boom(n):
+        raise OSError(5, "Input/output error")
+    with pytest.raises(OSError):
+        copy_atomic(str(src), str(tmp_path / "ziel"), on_bytes=boom)
+    assert os.listdir(tmp_path / "ziel") == [] and src.exists()
+
+
+def test_abgelehnter_alter_eintrag_haelt_den_beitrag_an(mock, tmp_path):
+    """Ausfall R3, F1: Lehnt Helmut einen alten Eintrag ab, kommt „ausgeliefert“ nicht vorbei – klare Meldung."""
+    from tonmischung.helmut.service import NotSettledError
+    svc, queue = _queued_service(mock, tmp_path)
+    c = svc.client.get("p1")
+    queue.add_asset("p1", "Bahnstreik", "/alt/ST.wav", "tonspur")
+    queue.add_mix("p1", "Bahnstreik", c.mix, mixstate.after_delivery(c.mix), "Jens", "Ton 3")
+    mock.fail_next = [400]
+    e = _engine(tmp_path)
+    with pytest.raises(NotSettledError, match="hängt noch in Helmut.*alten Einträge verwerfen"):
+        _run(svc, tmp_path, e=e)
+    assert e.calls == []
+    assert mock.mix_value("p1", "zustand") == "in_mischung"                     # „ausgeliefert“ kam nicht vorbei
+
+
+def test_freigeben_traegt_erst_nach(mock, tmp_path):
+    """Review R3: Freigeben liest sonst den alten Stand und überholt den Nachtrag."""
+    svc, queue = _queued_service(mock, tmp_path)
+    c = svc.client.get("p1")
+    queue.add_mix("p1", "Bahnstreik", c.mix, mixstate.with_state(c.mix, mixstate.MIXING, session_path="/neu.ptx"),
+                  "Jens", "Ton 3")
+    svc.release("p1", "Raumwechsel")
+    assert not queue.pending() and not queue.conflicts()
+    assert mock.mix_value("p1", "session_pfad") == "/neu.ptx"
+
+
+def test_ausfall_nur_bei_der_metadaten_datei_zustand_davor(mock, tmp_path):
+    """Review R3: auch dann steht „ausgeliefert“ vor der Metadaten-Datei."""
+    svc, queue = _queued_service(mock, tmp_path)
+    real = svc.client.add_asset
+
+    def gone(pid, path, kind):
+        if kind == "metadaten":
+            mock.unavailable = True
+        return real(pid, path, kind)
+    svc.client.add_asset = gone
+    r = _run(svc, tmp_path)
+    assert mock.mix_value("p1", "zustand") == "ausgeliefert"                    # vor der Datei geschrieben
+    assert [(x.kind, x.asset_kind) for x in queue.pending()] == [("asset", "metadaten")] and r.queued
+
+
+def test_videoid_pflicht_auch_ohne_fenster(mock, tmp_path):
+    e = _engine(tmp_path)
+    with pytest.raises(FetchError, match="VideoID fehlt"):
+        _deliver(mock, e, tmp_path, video_id_required=True)
+    assert e.calls == []
+    assert _deliver(mock, e, tmp_path, video_id="VID-1", video_id_required=True).delivered
+
+
+def test_abgelehntes_wav_wird_eingereiht_statt_abbruch(mock, tmp_path):
+    """Ausfall R4/N5: lehnt Helmut ein WAV ab, wird es eingereiht – kein Abbruch, kein erneutes Liefern mit
+    doppelten WAVs; „ausgeliefert“ und Metadaten folgen dahinter."""
+    from tonmischung.workflow.deliver import HINT_REJECTED
+    svc, queue = _queued_service(mock, tmp_path)
+    real = svc.client.add_asset
+
+    def reject_it(pid, path, kind):
+        if path.endswith("IT.wav"):
+            mock.fail_next = [400]
+        return real(pid, path, kind)
+    svc.client.add_asset = reject_it
+    r = _run(svc, tmp_path)
+    assert HINT_REJECTED in r.warnings and r.queued
+    assert [a["filepath"].rsplit("/", 1)[-1] for a in mock.assets["p1"]] == ["ST.wav"]      # vor dem Abgelehnten
+    assert [(x.kind, os.path.basename(x.path)) for x in queue.pending()] == [
+        ("asset", "IT.wav"), ("asset", "OGA.wav"), ("asset", "Mus.wav"), ("asset", "Spr.wav"),
+        ("mischung", ""), ("sperre", ""), ("asset", "p1_metadaten.json")]
+
+
+def test_ausgeliefert_abgelehnt_wird_eingereiht(mock, tmp_path):
+    from tonmischung.workflow.deliver import HINT_REJECTED
+    svc, queue = _queued_service(mock, tmp_path)
+    real = svc.client.write_mix
+
+    def reject(current, mix):
+        if mix.state == "ausgeliefert":
+            from tonmischung.helmut.client import HelmutError
+            raise HelmutError("Helmut lehnt PUT /v1/fx/projects/metadata/p1 ab (400)", status=400)
+        return real(current, mix)
+    svc.client.write_mix = reject
+    r = _run(svc, tmp_path)
+    assert HINT_REJECTED in r.warnings and len(mock.assets["p1"]) == 5
+    assert [x.kind for x in queue.pending()] == ["mischung", "sperre", "asset"]

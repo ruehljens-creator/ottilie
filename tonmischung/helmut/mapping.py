@@ -11,6 +11,8 @@ from __future__ import annotations
 import copy
 import logging
 import os
+import re
+import urllib.parse
 from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
@@ -30,6 +32,11 @@ MIX_KEYS = {
     "duplicate_of": "duplikat_von", "duplicate_session": "duplikat_mischstand",
     "session_mirror": "session_spiegel", "activity": "taetigkeit",
     "template": "template",           # ANNAHME: Feld im Set „Mischung“ wie die übrigen (am echten Helmut anlegen)
+    # ANNAHME: Feld legen wir an (Jens 10.11.2026: gibt es in Helmut noch nicht; wie Helmut die ID übergibt, ist
+    # offen – dann anpassen)
+    "video_id": "videoid",
+    # Betriebsart Übergabeordner (Sperrdatei); mit der Helmut-API bleibt es leer und wird nie angelegt
+    "handover_nr": "uebergabe_nr",
 }
 
 # Projektstatus (ProjectStatus.status). Die OpenAPI kennt LOCKED, HOUSEKEEPER, RESTORED, ARCHIVED.
@@ -56,6 +63,7 @@ class Handover:
     aaf: Asset | None
     video: Asset | None
     manifest: Asset | None
+    number: int = 0                 # Betriebsart Übergabeordner: uebergabe_nr der gelesenen Übergabe
 
     @property
     def complete(self) -> bool:
@@ -80,11 +88,26 @@ def token_from_login(headers: Any, body: Any) -> str | None:
     Die OpenAPI liefert es im Header `Authorization`; mit `responseWithToken=true` auch im Inhalt.
     """
     auth = (headers.get("Authorization") if headers is not None else None) or ""
-    if auth.lower().startswith("bearer "):
-        return auth.split(" ", 1)[1].strip() or None
+    if _BEARER_PREFIX.match(auth.strip()):
+        return bearer_token(auth) or None
     if isinstance(body, dict) and body.get("token"):
         return str(body["token"])
     return None
+
+
+_BEARER_PREFIX = re.compile(r"(?i)\Abearer\s+")
+_B64TOKEN = re.compile(r"[A-Za-z0-9\-._~+/]+=*")          # RFC 6750, 2.1
+
+
+def bearer_token(text: str) -> str:
+    """Token aus einem Schlüsselbund-Eintrag oder Kopf: das reine Token oder „Bearer <Token>“, auch URL-kodiert
+    („Bearer%20<Token>“, „…%3D“). Ein Bearer-Token enthält nie „%“ – Dekodieren ändert ein echtes Token nicht."""
+    return _BEARER_PREFIX.sub("", urllib.parse.unquote(text).strip(), count=1)
+
+
+def valid_bearer(token: str) -> bool:
+    """Nur Zeichen, die ein Bearer-Token haben darf – sonst scheitert der Kopf (Umbruch, typografische Zeichen)."""
+    return bool(_B64TOKEN.fullmatch(token))
 
 
 # ── Projekt ─────────────────────────────────────────────────────────────────
@@ -104,7 +127,7 @@ def parse_progress(value: Any) -> int:
     scheitern zu lassen (Review B7)."""
     try:
         return max(0, min(100, int(float(str(value).replace(",", ".").replace("%", "").strip()))))
-    except ValueError:
+    except (ValueError, OverflowError):
         log.warning("Fortschritt „%s“ in Helmut nicht lesbar – gilt als 0", value)
         return 0
 
@@ -147,7 +170,7 @@ def metadata_with_mix(project: dict, mix: MixState) -> list[dict]:
     """Vollständige Metadatenliste mit aktualisiertem Set „Mischung“.
 
     Fremde Einträge bleiben unverändert; vorhandene Felder des Sets behalten id, Typ und
-    Set-Verweis (mit dessen id), nur `value` ändert sich. Fehlende Felder kommen neu dazu.
+    Set-Verweis (mit dessen id), nur `value` ändert sich. Fehlende Felder mit Wert kommen neu dazu.
     ANNAHME: PUT /projects/metadata/{id} ersetzt die Liste – deshalb immer die ganze Liste.
     """
     wanted = {MIX_KEYS[k]: "" if v is None else str(v) for k, v in asdict(mix).items()}
@@ -162,7 +185,7 @@ def metadata_with_mix(project: dict, mix: MixState) -> list[dict]:
                 seen.add(key)
         out.append(m)
     for key, value in wanted.items():
-        if key not in seen:
+        if key not in seen and value:       # leer und noch nicht am Set: nicht anlegen (gilt ohnehin als leer)
             out.append({"name": key, "value": value, "type": "STRING",
                         "parent": [copy.deepcopy(parent) if parent else {"name": SET_MIX}]})
     return out
@@ -210,9 +233,16 @@ def find_handover(assets: list[dict]) -> Handover:
     return Handover(aaf=aaf, video=video, manifest=manifest)
 
 
+def handover_from_paths(aaf: str, video: str) -> Handover:
+    """Übergabe aus Dateipfaden (Havarie-Paket, Filmordner) – ohne Helmut-Assets."""
+    def asset(path: str) -> Asset | None:
+        return Asset("", os.path.basename(path), path) if path else None
+    return Handover(asset(aaf), asset(video), None)
+
+
 def new_asset(project_id: str, path: str, kind: str) -> dict:
-    """Asset für POST /v1/co/assets (Rückgabe der Tonspuren); Pflicht: filepath, mimeType."""
-    return {"projectId": project_id, "filepath": path, "mimeType": "AUDIO",
+    """Asset für POST /v1/co/assets (Rückgabe der Tonspuren und der Metadaten-Datei); Pflicht: filepath, mimeType."""
+    return {"projectId": project_id, "filepath": path, "mimeType": "DATA" if kind == "metadaten" else "AUDIO",
             "customMetadata": [{"key": "art", "value": kind}]}
 
 

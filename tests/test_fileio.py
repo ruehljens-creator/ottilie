@@ -5,7 +5,6 @@ import os
 import pytest
 
 from tonmischung.config.settings import Settings, SettingLockedError
-from tonmischung.core import rooms as R
 from tonmischung.core.fileio import CorruptFileError, read_json, set_aside, write_json
 
 
@@ -65,16 +64,6 @@ def test_unlesbare_einstellungen_werden_nicht_ueberschrieben(tmp_path):
     assert json.loads(path.read_text()) == {"persoenlich.farbschema": "bisher"}
 
 
-def test_raumliste_kaputt_wird_nicht_ersetzt(tmp_path):
-    """Vorher: kaputte gemeinsame raeume.json galt als „gibt es nicht“ → lokale Liste überschrieb sie."""
-    assert R.load(str(tmp_path)) is None
-    (tmp_path / R.FILE).write_text("{kaputt")
-    with pytest.raises(R.RoomsUnreadable):
-        R.load(str(tmp_path))
-    R.save(str(tmp_path / "neu"), [{"id": "t1", "name": "Ton 1", "rechnername": "ton1"}])
-    assert R.load(str(tmp_path / "neu"))[0]["name"] == "Ton 1"
-
-
 def test_neue_datei_nie_ueber_eine_vorhandene(tmp_path):
     from tonmischung.core.fileio import write_new, write_text
     target = tmp_path / "Ottilie Einstellungen.json"
@@ -101,3 +90,48 @@ def test_ohne_hardlinks_wird_umbenannt(tmp_path, monkeypatch):
     with pytest.raises(FileExistsError):
         write_new(target, lambda t: write_text(t, "zwei"))
     assert target.read_text() == "eins" and os.listdir(tmp_path) == ["Profil.json"]
+
+
+# ── Begleitdateien von macOS (SMB-Test 11.11.2026) ─────────────────────────────
+AD = b"\x00\x05\x16\x07" + b"\x00" * 60
+
+
+def test_begleitdatei_nur_echte_appledouble(tmp_path):
+    from tonmischung.core.fileio import drop_appledouble, os_metadata, sweep_appledouble
+    assert os_metadata("._film.aaf") and os_metadata(".DS_Store") and not os_metadata(".ottilie-sperre.json")
+    (tmp_path / "ST.wav").write_bytes(b"RIFF")
+    (tmp_path / "._ST.wav").write_bytes(AD)
+    assert drop_appledouble(tmp_path / "ST.wav") and not (tmp_path / "._ST.wav").exists()
+    assert (tmp_path / "ST.wav").read_bytes() == b"RIFF"
+    (tmp_path / "._fremd.wav").write_bytes(b"RIFF....")                # heißt nur so – bleibt
+    (tmp_path / "._gross").write_bytes(AD + b"\x00" * (1 << 20))       # zu groß – bleibt
+    (tmp_path / "._verwaist").write_bytes(AD)
+    (tmp_path / "ziel").write_bytes(AD)
+    os.symlink(tmp_path / "ziel", tmp_path / "._verweis")              # Verweis – weder gelöscht noch gefolgt
+    assert sweep_appledouble(tmp_path) == 1
+    assert sorted(os.listdir(tmp_path)) == ["._fremd.wav", "._gross", "._verweis", "ST.wav", "ziel"]
+    assert sweep_appledouble(tmp_path / "fehlt") == 0
+
+
+def test_write_json_entfernt_eigene_begleitdatei(tmp_path, monkeypatch):
+    real = os.replace
+
+    def replace(a, b):                                  # wie smbfs: Begleitdatei wandert mit
+        real(a, b)
+        with open(os.path.join(os.path.dirname(b), "._" + os.path.basename(b)), "wb") as f:
+            f.write(AD)
+    monkeypatch.setattr(os, "replace", replace)
+    write_json(tmp_path / "a.json", {"x": 1})
+    assert os.listdir(tmp_path) == ["a.json"]
+
+
+def test_waise_entscheidet_das_dateisystem(tmp_path):
+    """Sicherheit 11.11.2026: „._film.wav“ neben „Film.wav“ ist auf APFS/SMB (ohne Groß/Klein) keine Waise."""
+    from tonmischung.core.fileio import sweep_appledouble
+    (tmp_path / "Film.wav").write_bytes(b"RIFF")
+    if not (tmp_path / "film.wav").exists():
+        pytest.skip("Dateisystem unterscheidet Groß/Klein")
+    (tmp_path / "._film.wav").write_bytes(AD)
+    (tmp_path / "._weg.wav").write_bytes(AD)
+    assert sweep_appledouble(tmp_path, set()) == 1
+    assert sorted(os.listdir(tmp_path)) == ["._film.wav", "Film.wav"]

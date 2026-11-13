@@ -62,6 +62,8 @@ class MixState:
     session_mirror: str = ""        # „lokal mit Spiegelung“: Spiegelordner im Projekt (Plan M7-Ablage)
     activity: str = ""              # Raumstatus: „import“ | „export“ während eines Auftrags, sonst leer
     template: str = ""              # „Gruppe/Name“ des Templates, aus dem die Session angelegt wurde (Spurprofil)
+    video_id: str = ""              # Video-ID, beim Zurückliefern angegeben (Jens 10.11.2026)
+    handover_nr: str = ""           # Betriebsart Übergabeordner: importierte Fassung (uebergabe_nr), sonst leer
 
 
 def owned_by(current: MixState, mixer: str, room: str) -> bool:
@@ -95,11 +97,38 @@ def check_take(current: MixState, locked: bool, mixer: str, room: str) -> None:
     """
     if owned_by(current, mixer, room):
         return
+    if locked and stale_lock(current):
+        return                              # Sperre ohne Besitzer – Jens 11.11.2026: übernehmen erlauben
     if current.state in OWNED or locked:
         who = f"{current.mixer or 'jemand'} ({current.room or 'Raum unbekannt'})"
         raise ConflictError(f"Beitrag ist bereits übernommen von {who}, Zustand „{current.state}“")
     if current.state not in TAKEABLE:
         raise ConflictError(f"Beitrag kann im Zustand „{current.state}“ nicht übernommen werden")
+
+
+def stale_lock(current: MixState) -> bool:
+    """Gesperrt, aber niemandem zugeordnet: übernehmbarer Zustand und gar kein Mischer im Set (entsteht, wenn die
+    Sperre bei Helmut ankam, die Antwort aber nicht). Nach dem Freigeben ist der Mischer immer leer – ein gesperrter
+    „zurückgegebener“ Beitrag gilt also als ohne Besitzer. „ausgeliefert“ mit Mischer bleibt gesperrt (Prüfer
+    11.11.2026: sonst hebelte man z. B. eine Sperre des Cutters aus). `MixService._take` wartet vorher kurz, ob nicht
+    gerade jemand übernimmt."""
+    return current.state in TAKEABLE and current.state not in OWNED and not current.mixer
+
+
+def havarie_blocker(current: MixState, mixer: str, room: str, replay: bool = False) -> str:
+    """Darf eine Havarie-Session (ohne Helmut gemischt) diesem Beitrag zugeordnet bzw. ihre Übernahme nachgetragen
+    werden? Nicht, wenn ihn inzwischen jemand anders übernommen oder ausgeliefert hat – sonst überschriebe der
+    Nachtrag diesen Stand (Prüfer 11.11.2026). Beim Zuordnen (Helmut erreichbar) auch nicht, wenn derselbe Mischer
+    ihn schon normal geholt hat; im Nachtrag (`replay`) ist „gehört mir“ dagegen die eigene, schon angekommene
+    Havarie-Übernahme (Wiederholung nach verlorener Antwort). Rückgabe: Grund, leer = erlaubt."""
+    mine = current.mixer == mixer and current.room == room
+    if current.state in OWNED:
+        if mine:
+            return "" if replay else "du hast den Beitrag in Helmut schon normal übernommen"
+        return f"der Beitrag ist in Helmut bei {current.mixer or 'jemand'} ({current.room or '?'}) in Arbeit"
+    if current.state == DELIVERED and not mine:
+        return f"der Beitrag ist schon ausgeliefert ({current.mixer or 'jemand'}, {current.room or '?'})"
+    return ""
 
 
 def after_take(current: MixState, mixer: str, room: str, now: str) -> MixState:

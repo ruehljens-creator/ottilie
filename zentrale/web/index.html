@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ottilie-Zentrale</title>
+<link rel="manifest" href="web/manifest.webmanifest">
+<link rel="icon" href="web/ottilie-192.png" type="image/png">
+<link rel="apple-touch-icon" href="web/ottilie-192.png">
+<meta name="theme-color" content="#0b5cad">
+<link rel="stylesheet" href="web/app.css">
+</head>
+<body>
+<header>
+  <span class="brand"><img src="web/ottilie-192.png" alt="" width="34" height="34"><b>Ottilie</b></span>
+  <span id="raum" class="mut"></span>
+  <span id="verbindung" class="pill" role="status" aria-live="polite">nicht verbunden</span>
+  <nav id="tabs" hidden>
+    <button data-tab="raeume" aria-pressed="true">Räume</button>
+    <button data-tab="beitraege">Meine Beiträge</button>
+    <button data-tab="chat" id="tab-chat">Chat <span id="badge" class="badge" hidden></span></button>
+  </nav>
+</header>
+<main>
+  <section id="koppeln" hidden>
+    <h1>Gerät koppeln</h1>
+    <p>Den Kopplungscode gibt die Administration der Zentrale aus (Räume &amp; Geräte → Kopplungscode erzeugen).
+      Er gilt 15 Minuten und nur einmal.</p>
+    <form id="koppel-form">
+      <label>Kopplungscode <input id="code" autocomplete="one-time-code" maxlength="8" required
+        style="text-transform:uppercase;letter-spacing:3px"></label>
+      <label>Name dieses Geräts <input id="geraet" maxlength="60" placeholder="z. B. Schnitt 4 – Arbeitsplatz"></label>
+      <button class="primary">Koppeln</button>
+      <p id="koppel-fehler" class="bad" role="alert"></p>
+    </form>
+  </section>
+  <section id="raeume" hidden>
+    <h1>Räume</h1>
+    <table><thead><tr><th>Raum</th><th>Verbindung</th><th>Betriebsart</th><th>Beitrag</th><th>Zustand</th></tr></thead>
+      <tbody id="raum-liste"></tbody></table>
+  </section>
+  <section id="beitraege" hidden>
+    <h1>Meine Beiträge</h1>
+    <p class="mut" id="beitraege-leer">Noch keine Beiträge aus diesem Raum.</p>
+    <ul id="beitrag-liste" class="plain"></ul>
+  </section>
+  <section id="chat" hidden></section>
+</main>
+<script src="web/app.js"></script>
+</body>
+</html>

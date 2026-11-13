@@ -1,4 +1,4 @@
-# Ottilie 0.1 – mitgelieferte Software
+# Ottilie 0.3 – mitgelieferte Software
 
 Erzeugt mit `python3 -m tonmischung lizenzen`. Lizenz, Urheber, Projekt und – bei Werkzeugen und Bibliotheken – der Quelltext genau der mitgelieferten Version (unverändert). Die Lizenztexte liegen im Paket unter `bin/licenses/`, die der Schrift unter `ui/fonts/`.
 
@@ -26,7 +26,7 @@ Erzeugt mit `python3 -m tonmischung lizenzen`. Lizenz, Urheber, Projekt und – 
 | cffi | 2.0.0 | MIT | Armin Rigo, Maciej Fijalkowski | https://cffi.readthedocs.io | – | für python-soundfile |
 | pyloudnorm | 0.2.0 | MIT | Christian Steinmetz | https://github.com/csteinmetz1/pyloudnorm | – | Lautheit nach EBU R 128 |
 | rumps | 0.4.0 | BSD-3-Clause | Jared Suttles | https://github.com/jaredks/rumps | – | Menüleiste |
-| PyObjC | 12.2 | MIT | Ronald Oussoren u. a. | https://github.com/ronaldoussoren/pyobjc | – | Fenster, Dialoge, Bonjour, Schlüsselbund (macOS) |
+| PyObjC | 12.2 | MIT | Ronald Oussoren u. a. | https://github.com/ronaldoussoren/pyobjc | – | Fenster, Dialoge, Netzfreigaben, Schlüsselbund (macOS) |
 | PyUSB | 1.3.1 | BSD-3-Clause | Jonas Malaco u. a. | https://pyusb.github.io/pyusb | – | Focusrite Vocaster |
 | hidapi (cython-hidapi) | 0.15.0 | BSD-3-Clause (wahlweise GPL-3.0/HIDAPI) | Pavol Rusnak u. a. | https://github.com/trezor/cython-hidapi | – | Stream Deck / Vocaster |
 | MCP Python SDK | 1.27.2 | MIT | Anthropic, PBC | https://modelcontextprotocol.io | – | Schnittstelle für KI-Assistenten (optional) |

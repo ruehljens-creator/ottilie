@@ -1,0 +1,39 @@
+# Ottilie-Zentrale mit Docker Compose. Start (im Ordner zentrale/):   docker compose up -d --build
+# Nur 127.0.0.1:8470 – TLS und Veröffentlichung macht der Proxy davor (z. B. `tailscale serve --https=8443
+# http://127.0.0.1:8470` oder nginx, siehe nginx/). Befehle im Container: docker compose exec zentrale python -m app.cli …
+services:
+  zentrale:
+    build:
+      context: ..
+      dockerfile: zentrale/Dockerfile
+    image: ottilie-zentrale:0.2
+    container_name: ottilie-zentrale
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8470:8470"
+    environment:
+      # Öffentliche Adresse (für Links; ihr Pfad wird root_path, z. B. https://server/zentrale)
+      ZENTRALE_OEFFENTLICH: "${ZENTRALE_OEFFENTLICH:-}"
+      # X-Forwarded-For gilt nur von diesen Adressen: der Proxy auf dem Host erscheint mit der Adresse der
+      # Docker-Brücke. Nie „*“ – dann gälte die Adresse, die ein Client selbst angibt (Sicherheit 11.11.2026). Der Proxy
+      # muss X-Forwarded-For setzen bzw. anhängen; uvicorn nimmt die letzte nicht vertrauenswürdige Adresse.
+      ZENTRALE_PROXY: "${ZENTRALE_PROXY:-127.0.0.1,172.16.0.0/12}"
+      TZ: "${TZ:-Europe/Berlin}"
+      # Weitere Übergabeordner beobachten (Namen wie in der Administration → Übergabeordner):
+      # „Schnitt Nord=/mnt/uebergabe-nord;Archiv=/mnt/uebergabe-archiv“, dazu je ein Eintrag unter volumes
+      ZENTRALE_UEBERGABE_WEITERE: "${ZENTRALE_UEBERGABE_WEITERE:-}"
+    volumes:
+      - zentrale-daten:/data
+      # Übergabeordner nur lesend (Stufe 3 A: neue Beiträge sofort melden); Pfad auf dem Host anpassen
+      - "${UEBERGABEORDNER:-/srv/samba/ottilie-uebergabe}:/mnt/uebergabe:ro"
+      # - "/srv/samba/uebergabe-nord:/mnt/uebergabe-nord:ro"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  zentrale-daten:

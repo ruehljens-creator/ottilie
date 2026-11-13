@@ -71,6 +71,8 @@ app = BUNDLE(coll, name="Ottilie.app", bundle_identifier=BUNDLE_ID, version=__ve
                  # Dialog „Missing Files“ in Pro Tools beantworten (System Events), Pro Tools steuern
                  "NSAppleEventsUsageDescription": "Ottilie beantwortet Dialoge in Pro Tools nach Ihren "
                                                   "Einstellungen (z. B. „Missing Files“).",
-                 "NSLocalNetworkUsageDescription": "Ottilie zeigt den Raumstatus der anderen Mischräume (Bonjour).",
-                 "NSBonjourServices": ["_ottilie._tcp"],
+                 # Netz im Haus: Zentrale, Übergabeordner (SMB), Webtrigger von der Stream-Deck-Taste – Bonjour gibt
+                 # es seit 0.3 nicht mehr (Review 13.11.2026)
+                 "NSLocalNetworkUsageDescription": "Ottilie verbindet sich mit der Zentrale und den Übergabeordnern "
+                                                   "im Hausnetz und nimmt Webtrigger an.",
              })

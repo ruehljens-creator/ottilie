@@ -57,6 +57,7 @@ class MuxJob:
     start_tc: str = PROGRAM_START
     afd: int | None = 8
     use_bmx: bool = True
+    clip: str = ""                          # Name des Material Package (bmx --clip), z. B. „<VideoID> <Titel>“
 
 
 @dataclass(frozen=True)
@@ -181,7 +182,8 @@ def build_command(job: MuxJob, ffmpeg: str, video_duration_s: float, leader: Lea
 
 
 def bmx_command(job: MuxJob, bmx: str, intermediate: str, part: str, first_tc: str) -> list[str]:
-    return [bmx, *bmx_args(job.profile, job.afd), "-y", first_tc, "-o", part, intermediate]
+    clip = ["--clip", job.clip] if job.clip else []
+    return [bmx, *bmx_args(job.profile, job.afd), "-y", first_tc, *clip, "-o", part, intermediate]
 
 
 # ── Ausführen ───────────────────────────────────────────────────────────────

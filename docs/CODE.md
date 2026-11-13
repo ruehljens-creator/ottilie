@@ -78,13 +78,18 @@ flowchart TB
 
 Die Pfeile zeigen, wer wen aufruft. `core/` und `config/` hängen von nichts darüber ab; `ptsl/` und `helmut/` kennen
 nur ihr Gegenüber und `core/`. Nebenläufigkeit gibt es nur in `app/` (Aufträge im Hintergrund, Takte für Raumstatus,
-Spiegeln, fremde Dateien) und in `punch/triggers` (HTTP- und Socket-Server).
+Spiegeln, fremde Dateien, Verbindung zur Zentrale) und in `punch/triggers` (HTTP- und Socket-Server).
+
+Seit 0.3 läuft Ottilie nur mit der Zentrale (Plan „nur Zentrale“, interne Unterlagen): Raum, Betriebsart und
+Übergabeordner kommen von dort; ohne Verbindung gilt der zuletzt bekannte Stand (rechnerweit). Bonjour, die Raumliste,
+der Raumstatus über Helmut und das Übertragen von Einstellungen gibt es nicht mehr; wer Ottilie ohne Zentrale braucht,
+nimmt v0.2 (Zweig `standalone`).
 
 ## Wo was steht
 
 | Ordner | Inhalt | Einstieg |
 |---|---|---|
-| `tonmischung/core/` | Fachlogik ohne Pro Tools und Helmut: Zustände der Mischung (`mixstate`), Session-Regeln, Timecode, Namen, Spurprofile, Templates, Nutzer, Räume, Nachtrag-Warteschlange, sicheres Lesen und Schreiben eigener Dateien (`fileio`) | `mixstate.py`, `session_rules.py`, `fileio.py` |
+| `tonmischung/core/` | Fachlogik ohne Pro Tools und Helmut: Zustände der Mischung (`mixstate`), Session-Regeln, Timecode, Namen, Spurprofile, Templates, Nutzer, Nachtrag-Warteschlange (mit Urheber und Ziel), gemeinsamer Datenordner aller Benutzer eines Macs (`machine_data`), sicheres Lesen und Schreiben eigener Dateien (`fileio`) | `mixstate.py`, `session_rules.py`, `fileio.py`, `machine_data.py` |
 | `tonmischung/config/` | Einstellungen in Schichten, Schema (`einstellungen.schema.json`), Schlüsselbund, Doku für die Geräteverwaltung | `settings.py` |
 | `tonmischung/ptsl/` | Dünne Schicht über `py-ptsl`: ein Aufrufweg mit Zeitlimit, Sperre, Protokoll, verständlichen Fehlern; offene Pro-Tools-Dialoge erkennen | `client.py`, `dialogs.py` |
 | `tonmischung/helmut/` | HTTP-Client (nur Standardbibliothek), Übersetzung Helmut-JSON ↔ Objekte (`mapping`), Übernehmen/Freigeben/Ausliefern mit Konfliktprüfung (`service`), Nachtragen, Mock-Server | `service.py`, `client.py`, `mapping.py` |
@@ -92,7 +97,10 @@ Spiegeln, fremde Dateien) und in `punch/triggers` (HTTP- und Socket-Server).
 | `tonmischung/sessions/` | Pro-Tools-Teil: Import-Plan ausführen, Export (kürzen, konsolidieren, R 128, WAV je Spur), Triage-Verteilung in Pro Tools | `pt_export.py` |
 | `tonmischung/delivery/` | Havarie-Sendefile: Bild umpacken oder neu kodieren, Ton einmuxen (ffmpeg, bmx), Format- und MXF-Prüfung, Prüfsumme, Bericht, Transfer | `mux.py`, `qc.py`, `transfer.py` |
 | `tonmischung/workflow/` | Abläufe aus allem darunter: Holen, in offene Session holen, Zurückliefern, Stand öffnen, Havarie-Auslieferung, Spiegeln, fremde Dateien | `fetch.py`, `deliver.py` |
-| `tonmischung/app/` | Mac-App: Fenster (WKWebView), Menüleiste, Befehle je Thema (`*_app.py`), Aufträge, Viewmodel, API-Katalog, Raumstatus (Helmut und Bonjour) | `main.py`, `commands.py`, `jobs.py` |
+| `tonmischung/app/` | Mac-App: Fenster (WKWebView), Menüleiste, Befehle je Thema (`*_app.py`), Aufträge, Viewmodel, API-Katalog, Zentrale (Raum, Vorgaben, Chat, Raumstatus) | `main.py`, `commands.py`, `zentrale_app.py` |
+| `tonmischung/dropfolder/` | Betriebsart Übergabeordner: ein Ordner (`client`), mehrere Ordner als ein Client mit IDs „<Kennung>/<Film>“ (`multi`), Freigaben selbst einbinden (`netmount`), Sperrdatei, Fertigmeldung | `client.py`, `multi.py` |
+| `tonmischung/zentrale/` | Ottilie-Seite der Zentrale: Kopplung im System-Schlüsselbund (`device`), Verbindung (`link`), Belegen (`hooks`), zuletzt bekannter Raum und Vorgaben rechnerweit (`state`) | `link.py`, `device.py` |
+| `zentrale/` | Ottilie-Zentrale (eigener Dienst, Docker): Räume und Geräte, Anmelden ohne Code, Raumstatus, Chat, Belegen, Ordnerbeobachtung, Administration | `zentrale/app/main.py`, `zentrale/README.md` |
 | `tonmischung/app/ui/` | Oberfläche: `index.html`, `app.js` (ohne Framework), Stylesheets mit Farbrollen und fünf Farbschemata | `app.js` |
 | `tonmischung/punch/` | PunchBuddy-Funktionen in Ottilie: Kern über dieselbe PTSL-Verbindung, Befehle, Webtrigger, Stream-Deck-Starter | `core.py`, `commands.py` |
 | `tonmischung/` (oben) | Kommandozeile, MCP-Server, `factory` (Clients und Werte aus den Einstellungen), Pfade, Selbsttest, Diagnose, Watchdog | `cli.py`, `factory.py` |
@@ -235,6 +243,7 @@ TONMISCHUNG_UI_TESTS=1 python3 -m pytest -q tests/test_app_bridge.py           #
   Voreinstellungen; der AAF-Import ordnet nur nach Namen zu. Ottilie umgeht das, wo es geht (Umbenennen vor dem
   Import, Templates aus dem Template-Ordner, Prüfung jedes Clips danach).
 - Vorbereitet, aber nicht angebunden: FTP/FTPS/SFTP-Ziele der Havarie, Auslösung ohne Rückfrage (Countdown), die
-  Verarbeitung durch Helmut (Streams, Jobs), zentrale Einstellungen in Helmut; im Schema als „noch ohne Funktion“
-  ausgeblendet.
+  Verarbeitung durch Helmut (Streams, Jobs); im Schema als „noch ohne Funktion“ ausgeblendet.
+- Der gemeinsame Datenordner (`/Users/Shared/Ottilie`) setzt Vertrauen unter den Benutzern eines Macs voraus: jeder
+  kann die Dateien dort ändern. Ottilie folgt dort keinem Verweis und trägt fremde Einträge nicht von selbst nach.
 - Signatur und Notarisierung mit einem festen Zertifikat fehlen; das Paket ist ad hoc signiert.

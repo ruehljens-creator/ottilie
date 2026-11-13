@@ -7,17 +7,48 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Callable
 
 from tonmischung.core import mixstate
 from tonmischung.core.mixstate import ConflictError, MixState
-from tonmischung.core.catchup import HINT, CatchUpQueue
-from tonmischung.helmut.client import HelmutClient, HelmutError, HelmutUnavailableError
+from tonmischung.core.catchup import ASSET, HINT, HINT_AUTH, NOTIFY, CatchUpQueue
+from tonmischung.helmut.client import HelmutAuthError, HelmutClient, HelmutError, HelmutUnavailableError
+
 from tonmischung.helmut.mapping import Contribution
 
 log = logging.getLogger(__name__)
+
+
+class NotSettledError(HelmutUnavailableError):
+    """Ältere Nachträge dieses Beitrags stehen noch aus (Helmut lehnt ab, Nachtrag läuft gerade, Helmut weg). Gilt als
+    Ausfall: die *_or_queue-Wege reihen dahinter ein – die Reihenfolge bleibt, nichts geht verloren."""
+
+
+# Was eingereiht wird: Helmut nicht erreichbar – oder die Anmeldung abgelehnt (der Nachtrag wartet dann, bis sie wieder
+# gilt, Review 10.11.2026). Der Nachtrag prüft vor dem Schreiben, ob der Beitrag noch demselben Mischer gehört.
+QUEUED = (HelmutUnavailableError, HelmutAuthError)
+
+
+CONFLICT_OPEN = ("Für diesen Beitrag gibt es einen Konflikt im Nachtrag (oben in der Beitragsliste) – dort verwerfen "
+                 "oder klären, dann erneut versuchen")
+STALE_WAIT_S = 3.0          # Sperre ohne Besitzer: so lange warten, ob nicht gerade jemand übernimmt
+REPLAY_BUSY = "Ottilie trägt gerade Änderungen in Helmut nach – in ein paar Sekunden erneut versuchen"
+HINT_WAITING = ("Deine Änderung wird nachgetragen, sobald eine ältere Änderung an diesem Beitrag in Helmut steht "
+                "(siehe „Nachtrag“ in der Beitragsliste)")
+
+
+def _hint(error: Exception) -> str:
+    if isinstance(error, NotSettledError):
+        return HINT_WAITING
+    return HINT_AUTH if isinstance(error, HelmutAuthError) else HINT
+
+
+def _delivered(current: MixState, video_id: str | None) -> MixState:
+    after = mixstate.after_delivery(current)
+    return after if video_id is None else replace(after, video_id=video_id)
 
 
 def _now() -> str:
@@ -34,28 +65,34 @@ class MixService:
     _write_lock = threading.RLock()
 
     def __init__(self, client: HelmutClient, mixer: str, room: str,
-                 now: Callable[[], str] = _now, queue: CatchUpQueue | None = None) -> None:
+                 now: Callable[[], str] = _now, queue: CatchUpQueue | None = None,
+                 sleep: Callable[[float], None] = time.sleep) -> None:
         self.client = client
+        self._sleep = sleep
         self.mixer = mixer
         self.room = room
         self._now = now
         self.queue = queue                  # Nachtrag-Warteschlange; None = Ausfall ist ein Fehler
 
     def take(self, project_id: str) -> Contribution:
+        self.settle(project_id)
         with self._write_lock:
             return self._take(project_id)
 
     def set_state(self, project_id: str, state: str, **changes) -> Contribution:
+        self.settle(project_id)
         with self._write_lock:
             return self._set_state(project_id, state, **changes)
 
-    def mark_delivered(self, project_id: str, written: Callable[[], None] = lambda: None) -> Contribution:
+    def mark_delivered(self, project_id: str, written: Callable[[], None] = lambda: None,
+                       video_id: str | None = None) -> Contribution:
         """Nach dem Zurückliefern: Zustand „ausgeliefert“, dann entsperren – der Beitrag ist frei, Ottilie fragt vor
-        dem nächsten Holen nicht mehr nach der offenen Session (Jens 09.10.2026). `written`: Zustand steht in Helmut."""
+        dem nächsten Holen nicht mehr nach der offenen Session (Jens 09.10.2026). `written`: Zustand steht in Helmut.
+        `video_id`: mit „ausgeliefert“ ins Set „Mischung“ (None = bleibt, wie es ist)."""
         with self._write_lock:
             current = self.client.get(project_id)
             self.check_deliverer(current)
-            updated = self.client.write_mix(current, mixstate.after_delivery(current.mix))
+            updated = self.client.write_mix(current, _delivered(current.mix, video_id))
             written()
             if current.locked:
                 self.client.set_locked(project_id, False)
@@ -63,6 +100,7 @@ class MixService:
             return replace(updated, locked=False)
 
     def release(self, project_id: str, reason: str, keep: str = mixstate.KEEP_NEW) -> Contribution:
+        self.settle(project_id)
         with self._write_lock:
             return self._release(project_id, reason, keep)
 
@@ -87,32 +125,59 @@ class MixService:
     def _take(self, project_id: str) -> Contribution:
         """Übernehmen: prüfen, sperren, Set „Mischung“ schreiben."""
         current = self.client.get(project_id)
+        if current.locked and mixstate.stale_lock(current.mix):
+            # Sieht genauso aus wie ein anderer Raum mitten im Übernehmen (gesperrt, Set noch nicht geschrieben):
+            # kurz warten und neu lesen, erst dann als verwaist werten (Prüfer 11.11.2026)
+            self._sleep(STALE_WAIT_S)
+            current = self.client.get(project_id)
+            if current.locked and mixstate.stale_lock(current.mix):
+                log.warning("Beitrag %s gesperrt ohne Besitzer – wird von %s (%s) übernommen", project_id,
+                            self.mixer, self.room)
         mixstate.check_take(current.mix, current.locked, self.mixer, self.room)
+        stale = current.locked and mixstate.stale_lock(current.mix)
         locked_here = not current.locked
-        if locked_here:
-            self.client.set_locked(project_id, True)
         try:
+            if locked_here:                 # im try: kommt die Antwort nicht, wird die eigene Sperre zurückgenommen
+                try:
+                    self.client.set_locked(project_id, True)
+                except HelmutUnavailableError:
+                    raise
+                except HelmutError as e:    # 4xx abgelehnt (z. B. gerade fremd gesperrt): nicht unsere Sperre;
+                    if e.status is not None and e.status < 500:     # bei 5xx kann sie trotzdem stehen → zurücknehmen
+                        locked_here = False
+                    raise
             # nach dem Sperren noch einmal lesen: hat sich jemand dazwischengedrängt?
             current = self.client.get(project_id)
             mixstate.check_take(current.mix, False, self.mixer, self.room)
             new = mixstate.after_take(current.mix, self.mixer, self.room, self._now())
             updated = self.client.write_mix(current, new)
+            if stale:                       # Sperre ohne Besitzer übernommen: wer sperrte, könnte noch schreiben –
+                self._sleep(STALE_WAIT_S)   # nochmal warten, dann nachprüfen (Ausfall R8: langsame Antwort)
+            after = self.client.get(project_id).mix      # zwei Räume zugleich: wer zuletzt schrieb, gewinnt
+            if not mixstate.owned_by(after, self.mixer, self.room):
+                raise ConflictError(f"Beitrag wurde gleichzeitig von {after.mixer or 'jemand'} "
+                                    f"({after.room or '?'}) übernommen – hier nicht übernommen")
         except Exception:
             if locked_here:
-                self._undo_lock(project_id)
+                self._undo_lock(project_id, current.title)
             raise
         log.info("Beitrag %s übernommen von %s (%s)", project_id, self.mixer, self.room)
         return updated
 
-    def _undo_lock(self, project_id: str) -> None:
+    def _undo_lock(self, project_id: str, title: str) -> None:
         """Übernehmen nach dem Sperren gescheitert: die eigene Sperre zurücknehmen (Review B8: vorher blieb der
-        Beitrag gesperrt). Gehört er inzwischen jemandem, ist es dessen Sperre – dann bleibt sie."""
+        Beitrag gesperrt). Gehört er inzwischen jemandem, ist es dessen Sperre – dann bleibt sie. Geht das Entsperren
+        nicht, wird es nachgetragen (Review 10.11.2026; der Nachtrag lässt eine neue Übernahme unangetastet)."""
         try:
             if self.client.get(project_id).mix.state in mixstate.OWNED:
                 return
             self.client.set_locked(project_id, False)
             log.info("Beitrag %s: Übernehmen gescheitert – Sperre zurückgenommen", project_id)
         except HelmutError as e:
+            if self.queue is not None:
+                self.queue.add_lock(project_id, title, False)
+                log.warning("Beitrag %s: Übernehmen gescheitert, Entsperren eingereiht (%s)", project_id, e)
+                return
             log.error("Beitrag %s bleibt in Helmut gesperrt: Übernehmen gescheitert, Entsperren nicht möglich (%s)",
                       project_id, e)
 
@@ -173,52 +238,99 @@ class MixService:
         """
         try:
             return self.set_state(known.id, state, **changes), ""
-        except HelmutUnavailableError:
+        except QUEUED as e:
             if self.queue is None:
                 raise
             new = mixstate.with_state(known.mix, state, **changes)
             self.queue.add_mix(known.id, known.title, known.mix, new, self.mixer, self.room)
-            log.warning("Helmut nicht erreichbar – Zustand „%s“ für %s eingereiht", state, known.id)
-            return Contribution(known.id, known.title, known.show, known.locked, new, known.raw), HINT
+            log.warning("%s – Zustand „%s“ für %s eingereiht", e, state, known.id)
+            return Contribution(known.id, known.title, known.show, known.locked, new, known.raw), _hint(e)
 
-    def deliver_or_queue(self, known: Contribution) -> tuple[Contribution, str]:
+    def deliver_or_queue(self, known: Contribution, video_id: str | None = None,
+                         queue_only: bool = False) -> tuple[Contribution, str]:
         """`mark_delivered`; bei Ausfall einreihen (Set „Mischung“, dann entsperren). Rückgabe: (Beitrag, Hinweis).
         Fällt Helmut zwischen Zustand und Entsperren aus, wird nur das Entsperren nachgetragen."""
-        after = mixstate.after_delivery(known.mix)
+        after = _delivered(known.mix, video_id)
+        if queue_only and self.queue is not None:       # in diesem Lauf schon eingereiht: Reihenfolge halten
+            self.queue.add_mix(known.id, known.title, known.mix, after, self.mixer, self.room)
+            self.queue.add_lock(known.id, known.title, False)
+            return replace(known, locked=False, mix=after), ""     # der erste Hinweis dieses Laufs genügt
         written: list[bool] = []
         try:
-            return self.mark_delivered(known.id, lambda: written.append(True)), ""
-        except HelmutUnavailableError:
+            return self.mark_delivered(known.id, lambda: written.append(True), video_id), ""
+        except QUEUED as e:
             if self.queue is None:
                 raise
             if not written:
                 self.queue.add_mix(known.id, known.title, known.mix, after, self.mixer, self.room)
             self.queue.add_lock(known.id, known.title, False)
-            log.warning("Helmut nicht erreichbar – „ausgeliefert“ für %s eingereiht", known.id)
-            return replace(known, locked=False, mix=after), HINT
+            log.warning("%s – „ausgeliefert“ für %s eingereiht", e, known.id)
+            return replace(known, locked=False, mix=after), _hint(e)
 
     def release_or_queue(self, known: Contribution, reason: str, keep: str) -> str:
         """Freigeben; bei Ausfall einreihen (Set „Mischung“, dann entsperren). Rückgabe: Hinweis."""
         try:
             self.release(known.id, reason, keep)
             return ""
-        except HelmutUnavailableError:
+        except QUEUED as e:
             if self.queue is None:
                 raise
             new = mixstate.after_release(known.mix, reason, self._now(), keep)
             self.queue.add_mix(known.id, known.title, known.mix, new, self.mixer, self.room)
             self.queue.add_lock(known.id, known.title, False)
-            return HINT
+            return _hint(e)
 
-    def add_asset_or_queue(self, known: Contribution, path: str, kind: str) -> str:
+    def add_asset_or_queue(self, known: Contribution, path: str, kind: str, queue_only: bool = False) -> str:
+        """Asset anmelden; bei Ausfall – oder mit `queue_only`, weil in diesem Lauf schon etwas wartet – einreihen."""
+        if queue_only and self.queue is not None:
+            self.queue.add_asset(known.id, known.title, path, kind, self.mixer, self.room)
+            return ""                                   # der erste Hinweis dieses Laufs genügt
         try:
             self.client.add_asset(known.id, path, kind)
             return ""
-        except HelmutUnavailableError:
+        except QUEUED as e:
             if self.queue is None:
                 raise
-            self.queue.add_asset(known.id, known.title, path, kind)
-            return HINT
+            self.queue.add_asset(known.id, known.title, path, kind, self.mixer, self.room)
+            return _hint(e)
+
+    def settle(self, project_id: str) -> None:
+        """Vor dem Übernehmen und Zurückliefern: offene Nachträge dieses Beitrags erst schreiben – sonst überholte eine
+        alte eingereihte Lieferung das Neue (Ausfall 10.11.2026). Konflikt → ConflictError; antwortet Helmut
+        nicht, wie ein Ausfall (die *_or_queue-Wege reihen dann dahinter ein, die Reihenfolge bleibt)."""
+        if self.queue is None:
+            return
+
+        folder_mode = getattr(self.client, "mode", "") == "uebergabeordner"
+
+        def counts(e) -> bool:
+            # Betriebsart Übergabeordner: eine noch nicht zugestellte Fertigmeldung hält nichts auf – die Dateien liegen
+            # schon, sie ist der letzte Schritt (Review 4, Ausfall F3)
+            return e.kind != NOTIFY and not (folder_mode and e.kind == ASSET and e.asset_kind == "metadaten")
+
+        def mine(entries) -> bool:
+            return any(e.project_id == project_id and counts(e) for e in entries)
+        if mine(self.queue.conflicts()):
+            raise ConflictError(CONFLICT_OPEN)
+        if not mine(self.queue.pending()):
+            return
+        from tonmischung.helmut.catchup import replay     # spät: catchup braucht MixService
+        report = replay(self.queue, self.client, project_id=project_id)
+        if mine(self.queue.conflicts()):
+            raise ConflictError(CONFLICT_OPEN)
+        waiting = [e for e in self.queue.pending() if e.project_id == project_id and counts(e)]
+        if not waiting:
+            return
+        if report.rejected:
+            raise HelmutAuthError(report.rejected)
+        if report.busy:
+            raise NotSettledError(REPLAY_BUSY)
+        if report.unavailable:
+            raise NotSettledError("Ältere Änderungen an diesem Beitrag sind noch nicht in Helmut – Helmut antwortet "
+                                  "nicht")
+        raise NotSettledError("Die vorige Änderung an diesem Beitrag hängt noch in Helmut (siehe „Nachtrag“ oben in "
+                              "der Beitragsliste). Muss eine neue Fassung raus: dort die alten Einträge verwerfen, "
+                              "dann erneut versuchen.")
 
     def check_deliverer(self, current: Contribution) -> None:
         """Wie `check_owner`, aber auch für den, der den Beitrag ausgeliefert hat (erneut zurückliefern)."""

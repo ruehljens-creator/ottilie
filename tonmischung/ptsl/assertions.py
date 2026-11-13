@@ -8,6 +8,14 @@ hört aber sofort auf, statt „bitte bestätigen, danach geht es weiter“ zu m
 Quelle ist `~/Library/Logs/Avid/Pro_Tools_<Start>.txt` (Digitrace, wird laufend geschrieben; Zeile
 `PtApp_Assert(Release): …`). So wird die Assertion auch erkannt, wenn die Meldung schon weggeklickt ist. Ein neues
 Protokoll heißt: Pro Tools wurde neu gestartet.
+
+Es zählen `PtApp_Assert(Release)`, jede andere Stufe und die Meldung – nur `PtApp_Assert(Debug)` nicht: Die schreibt
+Pro Tools ohne Meldung und ohne Folgen, live 11.11.2026 (Mac mini) bei jedem Start und beim Anlegen einer Session aus
+dem Steuerflächen-Code (`Mackie_Controllers/UHUIController.cpp`, 92-mal in den Protokollen, nie ein Absturz); die App
+hatte deshalb das Holen abgebrochen. Ebenso wenig zählen die Zeilen des Stacktrace (`PtApp_Assert::Install()`).
+Umgekehrt ist auch „Release“ nicht immer tödlich (25.05.2026: zweimal „iter != mFileRefs.end()“, Pro Tools lief
+weiter) – die App bleibt dabei vorsichtig und sperrt bis zum Neustart.
+# ANNAHME: Eine Debug-Assertion führt in der ausgelieferten Pro-Tools-Fassung nie zu Meldung oder Absturz.
 """
 from __future__ import annotations
 
@@ -18,13 +26,16 @@ from collections.abc import Callable
 
 LOG_DIR = os.path.expanduser("~/Library/Logs/Avid")
 LOG_GLOB = "Pro_Tools_2*.txt"            # Pro_Tools_2026_10_03_16_57_04.txt (nicht Pro_Tools_Video_…)
-MARKERS = ("PtApp_Assert", "because Assertion in")
+# Jede Stufe außer „Debug“ zählt (Review: eine künftige Stufe wie „Fatal“ darf nicht durchrutschen); die
+# Stacktrace-Zeilen „PtApp_Assert::Install()“ haben keine Klammer dahinter.
+_ASSERT = re.compile(r"PtApp_Assert\((?!Debug\))")
+ALERT = "because Assertion in"
 MAX_READ = 8 << 20
 
 
 def assertion_lines(text: str) -> list[str]:
     """Zeilen mit einer Assertion (reine Logik)."""
-    return [line.strip() for line in text.splitlines() if any(m in line for m in MARKERS)]
+    return [line.strip() for line in text.splitlines() if ALERT in line or _ASSERT.search(line)]
 
 
 def short(line: str) -> str:

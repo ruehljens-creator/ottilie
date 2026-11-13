@@ -62,7 +62,7 @@ const state = {
   status: null, error: null, view: "list", query: "", order: savedOrder(), list: null, selected: null, detail: null,
   dialog: null, toast: null, flow: null, job: null, templates: null, returnFocus: null, preview: null,
   settings: null, rooms: null, history: null, users: null, theme: null, templatesMain: null, tplPick: null,
-  tplPickFor: null, pendingTriage: null, lastHvPath: null, dialogShown: null,
+  tplPickFor: null, pendingTriage: null, lastHvPath: null, dialogShown: null, listBusy: false,
 };
 
 function toast(text, err) {
@@ -82,6 +82,9 @@ function jobChip() {
     <span>${esc(j.title)}${j.state === "frage" ? " · Frage" : ""}</span><span class="bar" aria-hidden="true"><span style="width:${pct}%"></span></span></button>`;
 }
 
+// Betriebsart Übergabeordner (Jens 11.11.2026): Filme aus Ordnern statt aus Helmut
+function folderMode() { return !!(state.status && state.status.betriebsart === "uebergabeordner"); }
+
 function topbar(st) {
   const pt = !st ? "Pro Tools: …" : (st.pro_tools.ok
     ? "Pro Tools: " + (st.pro_tools.session || "keine Session offen") : "Pro Tools nicht erreichbar");
@@ -89,8 +92,16 @@ function topbar(st) {
   const ptHalt = st && st.pro_tools && st.pro_tools.halted
     ? `<span class="chip warn" data-alert title="${esc(st.pro_tools.error || "")}">Pro Tools: interner Fehler – neu starten</span>` : "";
   const h = st && st.helmut;
-  const hText = !h ? "Helmut …" : (h.ok ? (h.mock ? "Helmut-Mock verbunden" : "Helmut verbunden") : "Helmut nicht erreichbar");
-  const hCls = !h ? "" : (h.ok ? (h.mock ? "mock" : "ok") : "bad");
+  // Betriebsart Übergabeordner (Jens 11.11.2026): Ordner statt Helmut-API, in der Titelleiste sichtbar
+  const fm = folderMode();
+  const ro = fm && h && h.ok && h.nur_lesbar;
+  const hText = !h ? (fm ? "Übergabeordner …" : "Helmut …") : (fm
+    ? (h.ok ? (ro ? "Übergabeordner nur lesbar – Übernehmen und Zurückliefern gehen nicht" : "Ohne Helmut-API – Übergabeordner erreichbar")
+      : (h.error && h.error.startsWith("Übergabeordner nicht verbunden:") ? h.error
+        : "Übergabeordner nicht erreichbar – ist der Speicher im Finder verbunden?"))
+    : (h.ok ? (h.mock ? "Helmut-Mock verbunden" : "Helmut verbunden") : "Helmut nicht erreichbar"));
+  const modeChip = "";
+  const hCls = !h ? "" : (h.ok ? (h.mock ? "mock" : (ro ? "bad" : "ok")) : "bad");
   const n = st && st.nachtrag;
   const nChip = n && (n.offen || n.konflikte.length)
     ? `<span class="chip ${n.konflikte.length ? "warn" : ""}" role="status">Nachtrag: ${n.offen} offen${n.konflikte.length ? ` · ${n.konflikte.length} Konflikt${n.konflikte.length > 1 ? "e" : ""}` : ""}</span>` : "";
@@ -100,12 +111,20 @@ function topbar(st) {
   const sp = st && st.spiegel;
   const sChip = sp && (sp.zeit || sp.fehler)
     ? `<span class="chip ${sp.fehler ? "warn" : ""}" role="status" title="${esc(sp.ziel || "")}">${sp.fehler ? "Spiegeln: Fehler" : `gespiegelt ${esc(sp.zeit)}`}</span>` : "";
+  const z = st && st.zentrale;
+  // Ein Klick führt zur Seite „Zentrale“ (Tontechniker 13.11.2026); Ansagen kommen aus TM.on("zentrale"), nicht aus
+  // einem bei jedem Neuzeichnen neu entstehenden role="status" (Barrierefreiheit 13.11.2026)
+  const zChip = z && z.zustand !== "aus"
+    ? `<button class="chip ${z.zustand === "verbunden" ? "" : "warn"}" data-k="chip-zentrale" data-act="open-zentrale" title="${esc(z.text)}" aria-label="${esc(z.text)} – Einstellungen der Zentrale öffnen">${z.zustand === "verbunden" ? "Zentrale" : esc(z.text)}</button>` : "";
+  const pending = z && z.raum_ausstehend ? ` → ${esc(z.raum_ausstehend)}` : "";
+  const cChip = z && z.ungelesen
+    ? `<button class="chip warn" data-k="chip-chat" data-act="chat-unread" aria-label="Chat: ${z.ungelesen} ungelesen – öffnen">Chat: ${z.ungelesen} neu</button>` : "";
   return `<header class="topbar">
     <div class="brand"><img src="ottilie.png" alt="" width="44" height="44"><span class="title">Ottilie</span></div><div class="grow"></div>
-    ${jobChip()}${nChip}${fChip}${sChip}
+    ${jobChip()}${nChip}${fChip}${sChip}${zChip}${cChip}
     ${ptHalt || `<span class="hint mono" style="font-size:12px">${esc(pt)}</span>`}
-    <div class="state"><span class="dot ${hCls}" aria-hidden="true"></span>${esc(hText)}</div>
-    <button class="chip" data-k="chip-user" data-act="login-open" aria-label="${st && st.user ? `Angemeldet: ${esc(st.user.name)} – Nutzer wechseln` : "Nicht angemeldet – Nutzer wählen"}, Raum ${esc(st ? st.room : "")}">${st && st.user ? esc(st.user.name) : "Nicht angemeldet"} · <strong style="color:var(--text)">${esc(st ? st.room : "")}</strong></button>
+    ${modeChip}<div class="state" title="${esc(h && h.error ? h.error : "")}"><span class="dot ${hCls}" aria-hidden="true"></span>${esc(hText)}</div>
+    <button class="chip" data-k="chip-user" data-act="login-open" aria-label="${st && st.user ? `Angemeldet: ${esc(st.user.name)} – Nutzer wechseln` : "Nicht angemeldet – Nutzer wählen"}, Raum ${esc(st ? st.room : "")}${pending ? `, heißt künftig ${esc(z.raum_ausstehend)}, sobald hier nichts mehr in Arbeit ist` : ""}" ${pending ? `title="Die Zentrale führt diesen Mac als „${esc(z.raum_ausstehend)}“ – Ottilie übernimmt den Namen, sobald hier nichts mehr in Arbeit ist"` : ""}>${st && st.user ? esc(st.user.name) : "Nicht angemeldet"} · <strong style="color:var(--text)">${esc(st ? st.room : "")}</strong>${pending ? `<span class="muted">${pending} (nach dem Zurückliefern)</span>` : ""}</button>
   </header>`;
 }
 
@@ -118,7 +137,7 @@ function nav() {
   };
   return `<nav class="nav" aria-label="Ansichten">
     <div class="nav-head" aria-hidden="true">PROJEKTE</div>
-    ${item("list", "Zur Mischung")}${item("rooms", "Räume")}${item("history", "Gemachte Mischungen")}
+    ${item("list", "Zur Mischung")}${item("rooms", "Räume")}${item("history", "Gemachte Mischungen")}${chatOn() ? item("chat", "Chat") : ""}
     <div class="grow"></div>
     <button class="side-item" data-k="nav-havarie" data-act="havarie"><span>Paket manuell öffnen …</span></button>
     <button class="side-item" data-k="nav-hvdel" data-act="hvdel"><span>Havarie: Sendefile ausliefern …</span></button>
@@ -128,6 +147,14 @@ function nav() {
 }
 
 // ── Liste und Detail ────────────────────────────────────────────────────────
+function zentraleConflictBanner() {
+  const k = (state.status && state.status.zentrale && state.status.zentrale.konflikte) || [];
+  if (!k.length) return "";
+  return `<div class="banner warn" data-alert style="margin:8px 16px;flex-direction:column;align-items:flex-start">
+    ${k.map((c) => `<div>Konflikt: „${esc(c.titel || c.beitrag_id)}“ ist laut Zentrale in ${esc(c.belegt_von)} belegt. Nicht zurückliefern, bevor das geklärt ist – mit ${esc(c.belegt_von)} sprechen oder die Administration die Belegung lösen lassen.</div>`).join("")}
+  </div>`;
+}
+
 function catchUpBanner() {
   const n = state.status && state.status.nachtrag;
   const hv = (n && n.ohne_beitrag) || [];
@@ -137,14 +164,18 @@ function catchUpBanner() {
       <button class="btn ghost sm" data-k="hv-drop-${esc(h.id)}" data-ntdrophv="${esc(h.id)}" data-hvtitle="${esc(h.titel)}">Verwerfen …</button></li>`).join("")}</ul>
   </div>` : "";
   if (!n || (!n.offen && !n.konflikte.length)) return hvBox;
-  const conf = n.konflikte.map((c) => `<li>${esc(c.text)} – ${esc(c.grund)}
+  // Nachtrag gilt für alle Benutzer des Macs (13.11.2026): wer, wann und warum es wartet
+  const who = (e) => e.benutzer ? ` (von Benutzer ${esc(e.benutzer)})` : "";
+  const conf = n.konflikte.map((c) => `<li>${esc(c.text)}${who(c)} – ${esc(c.grund)}
       <button class="btn ghost sm" data-k="nt-drop-${esc(c.id)}" data-ntdrop="${esc(c.id)}">Verwerfen …</button></li>`).join("");
   // Jens 09.10.2026: auch noch offene Änderungen einzeln oder alle verwerfen können
-  const open = (n.eintraege || []).map((e) => `<li>${esc(e.text)}
+  const open = (n.eintraege || []).map((e) => `<li>${esc(e.text)}${who(e)}${e.grund ? ` – ${esc(e.grund)}` : ""}
       <button class="btn ghost sm" data-k="nt-drop-${esc(e.id)}" data-ntdrop="${esc(e.id)}">Verwerfen …</button></li>`).join("");
+  const target = folderMode() ? "auf den Übergabeordner bzw. die Fertigmeldung" : "auf Helmut";
+  const others = (n.fremde || []).length ? ` Darunter Änderungen anderer Benutzer dieses Macs (${n.fremde.map(esc).join(", ")}) – „Jetzt nachtragen“ trägt sie mit nach.` : "";
   return `<div class="banner ${n.konflikte.length ? "warn" : "info"}" role="note" style="margin:8px 16px;flex-direction:column;align-items:flex-start">
-    <div>${n.offen ? `${n.offen} Änderung${n.offen > 1 ? "en warten" : " wartet"} auf Helmut und ${n.offen > 1 ? "werden" : "wird"} nachgetragen.` : ""}
-      ${n.konflikte.length ? " Nicht nachgetragen, weil der Beitrag inzwischen anders zugewiesen ist:" : ""}</div>
+    <div>${n.offen ? `${n.offen} Änderung${n.offen > 1 ? "en warten" : " wartet"} ${target} und ${n.offen > 1 ? "werden" : "wird"} nachgetragen.` : ""}
+      ${n.konflikte.length ? " Nicht nachgetragen – bitte prüfen:" : ""}${others}</div>
     ${open ? `<ul class="warnlist">${open}</ul>` : ""}
     ${conf ? `<ul class="warnlist">${conf}</ul>` : ""}
     <div style="display:flex;gap:8px"><button class="btn sm" data-k="nt-now" data-act="catchup">Jetzt nachtragen</button>
@@ -152,12 +183,22 @@ function catchUpBanner() {
   </div>` + hvBox;
 }
 
+// Mehrere Übergabeordner: welche gerade fehlen. Angesagt wird nur die Liste der Namen (ändert sich selten), nicht
+// der wechselnde Grund (Barrierefreiheit 13.11.2026).
+function folderProblems() {
+  const p = (state.list && state.list.ordner_probleme) || [];
+  if (!p.length) return "";
+  return `<div class="banner warn" style="flex-direction:column;align-items:flex-start">
+    <span data-alert>Übergabeordner nicht erreichbar: ${p.map((x) => esc(x.name)).join(", ")}. Ottilie versucht es weiter – Filme aus den anderen Ordnern gehen.</span>
+    <ul class="plain">${p.map((x) => `<li>${esc(x.name)}: ${esc(x.meldung)}</li>`).join("")}</ul></div>`;
+}
+
 function listView() {
   const rows = state.list ? state.list.rows : null;
   const title = "Zur Mischung anstehend";
   const full = rows && rows.some((p) => p.due !== "–" || p.length !== "–" || p.cutter !== "–");
   const bySend = state.order === "sendung";
-  const sub = (p) => [bySend ? "" : esc(p.show), p.air && p.air !== "–" ? esc(p.air) : "", p.handed ? `übergeben ${esc(p.handed)}` : ""]
+  const sub = (p) => [bySend ? "" : esc(p.show), p.air && p.air !== "–" ? esc(p.air) : "", p.origin ? `aus ${esc(p.origin)}` : "", p.folder ? `Ordner ${esc(p.folder)}${p.folder_down ? " nicht erreichbar" : ""}` : (p.folder_down ? "Ordner nicht erreichbar" : ""), p.handed ? `übergeben ${esc(p.handed)}` : ""]
     .filter(Boolean).join(" · ");
   const counts = {};
   (rows || []).forEach((p) => { counts[p.group] = (counts[p.group] || 0) + 1; });
@@ -170,7 +211,7 @@ function listView() {
   const body = !rows ? `<div class="empty" role="status">Lade Beiträge …</div>`
     : (!rows.length ? `<div class="empty" role="status">${state.query ? "Keine Treffer." : "Keine Beiträge."}</div>` : rows.map((p) => `${head1(p)}
       <button class="row ${full ? "" : "compact"} ${state.selected === p.id ? "sel" : ""}" data-k="row-${esc(p.id)}" data-pick="${esc(p.id)}"
-        aria-current="${state.selected === p.id ? "true" : "false"}" aria-label="${esc(p.title)}, ${esc(p.show)}, ${esc(p.state)}${p.urgent ? ", dringend" : ""}${(p.tags || []).map((g) => ", " + esc(g)).join("")}">
+        aria-current="${state.selected === p.id ? "true" : "false"}" aria-label="${esc(p.title)}, ${esc(p.show)}, ${esc(p.state)}${p.urgent ? ", dringend" : ""}${(p.tags || []).map((g) => ", " + esc(g)).join("")}${p.folder ? `, Ordner ${esc(p.folder)}` : ""}${p.folder_down ? ", Ordner nicht erreichbar" : ""}">
         <span class="dot ${p.urgent ? "urgent" : "normal"}" aria-hidden="true"></span>
         <span class="t1"><span class="name">${esc(p.title)}${(p.tags || []).map((g) => ` <span class="tag">${esc(g)}</span>`).join("")}</span><span class="muted">${sub(p)}</span></span>
         ${full ? `<span class="mono">${esc(p.due)}</span><span class="mono">${esc(p.length)}</span><span>${esc(p.cutter)}</span>` : ""}
@@ -180,15 +221,18 @@ function listView() {
     : `<span></span><span>Beitrag / Sendung</span><span>Status</span><span></span>`;
   return `<main class="main" aria-labelledby="list-title">
     <div class="list-head">
-      <div class="title"><h1 id="list-title" tabindex="-1" data-k="view-title">${title}</h1><span class="muted">${rows ? rows.length : ""} Beiträge</span></div>
+      <div class="title"><h1 id="list-title" tabindex="-1" data-k="view-title">${title}</h1><span class="muted">${rows ? rows.length : ""} Beiträge</span>
+        <span class="grow"></span><span class="muted" id="list-stamp">${state.listBusy ? "Lese neu ein …" : ""}</span>
+        <button class="btn ghost sm" data-k="list-refresh" data-act="list-refresh" ${state.listBusy ? 'aria-busy="true"' : ""} title="Liste sofort neu einlesen (⌘R)">${state.listBusy ? '<span class="spin" aria-hidden="true"></span> ' : ""}Aktualisieren</button></div>
       ${roomStrip()}
+      ${folderProblems()}
       <label class="sr-only" for="q">Suchen in Titel, Sendung, Cutter, Mischer, Raum (⌘F)</label>
       <input class="inp" id="q" data-k="q" type="search" placeholder="Suchen: Titel, Sendung, Cutter, Mischer, Raum" value="${esc(state.query)}">
       <div class="seg-group" role="radiogroup" aria-label="Sortierung">
         ${[["zeit", "Nach Zeit"], ["sendung", "Nach Sendung"]].map(([v, l]) => `<button class="seg ${state.order === v ? "on" : ""}" role="radio" aria-checked="${state.order === v}" data-k="order-${v}" data-order="${v}">${l}</button>`).join("")}
       </div>
     </div>
-    ${catchUpBanner()}
+    ${zentraleConflictBanner()}${catchUpBanner()}
     <div class="row-head ${full ? "" : "compact"}" aria-hidden="true">${head}</div>
     <div class="rows" role="list" aria-label="Beiträge">${body}</div>
   </main>`;
@@ -233,9 +277,9 @@ async function loadRooms() {
 function roomsView() {
   const r = state.rooms;
   const cards = !r ? `<div class="empty" role="status">Lade Räume …</div>` : r.cards.map((c, i) => `
-    <section class="room-card" aria-label="${esc(c.name)}: ${esc(c.label)}${c.mixer ? ", " + esc(c.mixer) : ""}">
+    <section class="room-card" aria-label="${esc(c.name)}: ${esc(c.label)}${c.mixer ? ", " + esc(c.mixer) : ""}${c.modus_anders ? ", andere Betriebsart: " + esc(c.modus) : ""}">
       <div class="room-head"><span class="dot ${roomClass(c)}" aria-hidden="true"></span>
-        <strong>${esc(c.name)}</strong>${c.here ? ' <span class="tag">hier</span>' : ""}<span class="grow"></span><span class="pill ${c.st === "frei" && c.online !== false ? "ready" : "busy"}">${esc(c.label)}</span></div>
+        <strong>${esc(c.name)}</strong>${c.here ? ' <span class="tag">hier</span>' : ""}${c.modus_anders ? ` <span class="tag" title="Dieser Raum läuft in einer anderen Betriebsart">${esc(c.modus)}</span>` : ""}<span class="grow"></span><span class="pill ${c.st === "frei" && c.online !== false ? "ready" : "busy"}">${esc(c.label)}</span></div>
       <div>${c.user || c.mixer ? esc(c.user || c.mixer) : '<span class="muted">niemand angemeldet</span>'}</div>
       <div class="muted">${c.title ? esc(c.title) : "kein Beitrag in Arbeit"}${c.busy_count > 1 ? ` (+${c.busy_count - 1} weitere)` : ""}</div>
       ${c.pct ? `<div class="bar" role="progressbar" aria-label="Fortschritt ${esc(c.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${c.pct}"><span style="width:${c.pct}%"></span></div>` : ""}
@@ -245,6 +289,7 @@ function roomsView() {
   return `<main class="main" aria-labelledby="rooms-title">
     <div class="list-head"><div class="title"><h1 id="rooms-title" tabindex="-1" data-k="view-title">Räume</h1><span class="muted">${r ? `${r.busy} belegt` : ""}</span></div></div>
     <div class="room-grid">${cards}</div>
+    ${r && r.gemischt ? `<div class="banner warn" data-alert style="margin:8px 16px">${esc(r.gemischt)}</div>` : ""}
     <p class="hint" style="margin:8px 16px">${r ? esc(r.source) : ""}</p>
   </main>`;
 }
@@ -404,9 +449,25 @@ function importStep() {
   let end = "";
   if (j.state === "fertig" && j.result && j.kind === "zurueckliefern") {
     const r = j.result;
-    end = `<div class="banner ok" role="status">${r.wavs.length} WAVs an Helmut übergeben. Zustand in Helmut: ausgeliefert, Beitrag freigegeben.</div>
-      <dl class="kv"><dt>Ordner</dt><dd>${esc(r.folder)}</dd></dl>
-      <ul class="warnlist" aria-label="Übergebene WAVs">${r.wavs.map((w) => `<li class="mono">${esc(w)}</li>`).join("")}</ul>
+    const fm = r.betriebsart === "uebergabeordner";
+    const fmText = { gesendet: "Fertigmeldung gesendet, Beitrag freigegeben.",
+      aus: "Keine Fertigmeldung eingestellt – dem Schnitt Bescheid geben.",
+      nachtrag: "Die Sperrdatei ist noch nicht auf „ausgeliefert“ – wird nachgetragen. Keine Fertigmeldung eingestellt – dem Schnitt Bescheid geben. <strong>Nicht erneut zurückliefern.</strong>",
+      wartet: "Die Fertigmeldung ist noch nicht angekommen und wird wiederholt. <strong>Nicht erneut zurückliefern.</strong>",
+      abgelehnt: "Die Fertigmeldung wurde abgelehnt – Ottilie versucht es weiter; erscheint ein Konflikt unter „Nachtrag“, beim Schnitt Bescheid geben. <strong>Nicht erneut zurückliefern.</strong>" };
+    end = fm ? `<div class="banner ${r.fertigmeldung === "gesendet" ? "ok" : "warn"}" role="status">${r.wavs.length} WAVs liegen in „Audio Export“. ${fmText[r.fertigmeldung] || ""}</div>` + `
+      <dl class="kv"><dt>Ordner</dt><dd>${esc(r.folder)}</dd>${r.metadaten ? `<dt>Metadaten</dt><dd class="mono">${esc(r.metadaten)}</dd>` : ""}
+        ${r.videoid || r.videoid_ask ? `<dt>VideoID</dt><dd class="mono">${esc(r.videoid || "nicht angegeben")}</dd>` : ""}</dl>
+      <ul class="warnlist" aria-label="Gelieferte WAVs">${r.wavs.map((w) => `<li class="mono">${esc(w)}</li>`).join("")}</ul>
+      ${r.warnings.length ? `<h3 style="margin:0;font-size:15px">Hinweise</h3><ul class="warnlist">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}`
+    : (r.nachtrag === "abgelehnt"
+      ? `<div class="banner warn" role="status">${r.wavs.length} WAVs liegen vollständig im Übergabeordner. Helmut hat einen Teil der Lieferung abgelehnt – Ottilie versucht es in den nächsten Minuten weiter. <strong>Nicht erneut zurückliefern.</strong></div>`
+      : r.nachtrag
+      ? `<div class="banner warn" role="status">${r.wavs.length} WAVs liegen vollständig im Übergabeordner. In Helmut noch nicht (vollständig) eingetragen – wird nachgetragen, sobald Helmut wieder erreichbar ist. <strong>Nicht erneut zurückliefern.</strong></div>`
+      : `<div class="banner ok" role="status">${r.wavs.length} WAVs an Helmut übergeben. Zustand in Helmut: ausgeliefert, Beitrag freigegeben.</div>`) + `
+      <dl class="kv"><dt>Ordner</dt><dd>${esc(r.folder)}</dd>${r.metadaten ? `<dt>Metadaten</dt><dd class="mono">${esc(r.metadaten)}</dd>` : ""}
+        ${r.videoid || r.videoid_ask ? `<dt>VideoID</dt><dd class="mono">${esc(r.videoid || "nicht angegeben")}</dd>` : ""}</dl>
+      <ul class="warnlist" aria-label="${r.nachtrag ? "WAVs im Übergabeordner" : "Übergebene WAVs"}">${r.wavs.map((w) => `<li class="mono">${esc(w)}</li>`).join("")}</ul>
       ${r.warnings.length ? `<h3 style="margin:0;font-size:15px">Hinweise</h3><ul class="warnlist">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}`;
   } else if (j.state === "fertig" && j.result && j.kind === "havarie_ausliefern") {
     const r = j.result;
@@ -419,12 +480,12 @@ function importStep() {
       ${r.warnings.length ? `<h3 style="margin:0;font-size:15px">Hinweise</h3><ul class="warnlist">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}`;
   } else if (j.state === "fertig" && j.result && j.kind === "wiederoeffnen") {
     const r = j.result;
-    end = `<div class="banner ok" role="status">Kopie ist in Pro Tools geöffnet. Zustand in Helmut: importiert.</div>
+    end = `<div class="banner ok" role="status">Kopie ist in Pro Tools geöffnet. ${folderMode() ? "Beitrag ist für dich gesperrt." : "Zustand in Helmut: importiert."}</div>
       <dl class="kv"><dt>Session</dt><dd class="mono">${esc(r.session)}</dd><dt>Spuren</dt><dd>${r.tracks}</dd></dl>
       ${r.warnings.length ? `<h3 style="margin:0;font-size:15px">Hinweise</h3><ul class="warnlist">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}`;
   } else if (j.state === "fertig" && j.result) {
     const r = j.result;
-    end = `<div class="banner ok" role="status">Session ist in Pro Tools geöffnet. Zustand in Helmut: importiert.</div>
+    end = `<div class="banner ok" role="status">Session ist in Pro Tools geöffnet. ${folderMode() ? "Beitrag ist für dich gesperrt." : "Zustand in Helmut: importiert."}</div>
       <dl class="kv">
         ${r.open_import ? `<dt>Import</dt><dd>${esc(r.how)}</dd>${r.previous ? `<dt>Bisheriger Beitrag</dt><dd>„${esc(r.previous)}“ ${esc(r.previous_action)}</dd>` : ""}` : ""}
         <dt>Clips</dt><dd>${r.clips_ok} von ${r.clips} exakt an ihrer Stelle</dd>
@@ -530,6 +591,24 @@ function triageStep() {
   </div>`;
 }
 
+// Warum „Zurückliefern starten“ (noch) nicht geht – leer: es geht. Ein leeres Feld lässt die VideoID in Helmut stehen.
+function deliverBlocked() {
+  const { info: i, sel, videoid } = state.flow;
+  if (!i) return "Lade …";
+  if (!Object.values(sel).some(Boolean)) return "Keine Exportspur gewählt";
+  if (i.neue_fassung && !state.flow.newOk) return "Erst bestätigen, welche Fassung gesendet wird";
+  return i.videoid_required && !videoid.trim() && !i.videoid ? "Erst VideoID eintragen" : "";
+}
+
+// Die Schaltfläche bleibt fokussierbar (aria-disabled), damit VoiceOver den Grund vorlesen kann
+function syncDeliverStart() {
+  const b = document.querySelector('[data-act="del-start"]');
+  const why = document.getElementById("del-why");
+  const text = deliverBlocked();
+  if (b) b.setAttribute("aria-disabled", String(!!text));
+  if (why) why.textContent = text;
+}
+
 function deliverOverview() {
   const f = state.flow;
   const i = f.info;
@@ -539,13 +618,20 @@ function deliverOverview() {
   const missing = i.session_open ? listed.filter((t) => !i.session_tracks.includes(t)) : [];
   return `<div class="flow-body"><div class="cols">
     <section aria-labelledby="h-del">
-      <h2 id="h-del">An Helmut zurückliefern</h2>
-      <span class="hint">Konsolidieren über die Videolänge, Lautheit nach EBU R 128, je Spur eine WAV (24 bit / 48 kHz) in den Übergabeordner.</span>
+      <h2 id="h-del">${folderMode() ? "Zurückliefern nach „Audio Export“" : "An Helmut zurückliefern"}</h2>
+      <span class="hint">Konsolidieren über die Videolänge, Lautheit nach EBU R 128, je Spur eine WAV (24 bit / 48 kHz) ins Ziel.</span>
+      ${i.neue_fassung ? `<div class="banner warn" data-alert>${esc(i.neue_fassung)}</div>
+        <label class="chk"><input type="checkbox" id="del-newok" data-k="del-newok" data-del-newok="1" ${f.newOk ? "checked" : ""}><span>Ich habe geklärt, dass diese Fassung gesendet wird</span></label>` : ""}
       <dl class="kv">
         <dt>Session</dt><dd>${esc(i.session || "–")}${i.session ? (i.session_open ? " (offen)" : " (wird geöffnet)") : ""}</dd>
-        <dt>Übergabeordner</dt><dd>${esc(i.target)}</dd>
+        <dt>Ziel</dt><dd>${esc(i.target)}</dd>
         <dt>Lautheit</dt><dd>${i.loudness_on ? `${esc(i.lufs)} LUFS, True Peak höchstens ${esc(i.truepeak)} dBTP für ${esc(i.loudness.join(", ") || "–")}` : "aus"}</dd>
       </dl>
+      ${i.videoid_ask ? `<label class="field"><span>VideoID${i.videoid_required ? " (Pflicht)" : ""}</span>
+        <input class="inp mono" id="del-videoid" data-k="del-videoid" aria-label="VideoID" aria-describedby="del-videoid-hint" maxlength="64" autocomplete="off" spellcheck="false"
+          placeholder="z. B. aus der Sendeplanung" value="${esc(f.videoid)}" ${i.videoid_required ? 'aria-required="true"' : ""}></label>
+        ${i.videoid_clipboard ? `<div><button class="btn sm" data-k="del-paste" data-act="del-paste">Aus Zwischenablage einfügen</button></div>` : ""}
+        <span class="hint" id="del-videoid-hint">${i.videoid ? `Aus Helmut übernommen. Feld leeren löscht sie nicht – dann bleibt ${esc(i.videoid)} in Helmut. ` : ""}${folderMode() ? "Wird in der Metadaten-Datei gespeichert." : "Wird in Helmut und in der Metadaten-Datei gespeichert."}${i.videoid_required ? " Pflicht – ohne VideoID kein Zurückliefern." : ""}</span>` : ""}
     </section>
     <section aria-labelledby="h-tracks">
       <h2 id="h-tracks">Exportspuren</h2>
@@ -557,8 +643,9 @@ function deliverOverview() {
     </section>
   </div></div>
   <div class="flow-foot">
+    <span class="hint" id="del-why" aria-live="polite">${esc(deliverBlocked())}</span>
     <button class="btn" data-k="flow-cancel" data-act="flow-cancel">Abbrechen</button>
-    <button class="btn pri" data-k="del-start" data-act="del-start" ${listed.length ? "" : 'disabled aria-disabled="true"'}>Zurückliefern starten</button>
+    <button class="btn pri" data-k="del-start" data-act="del-start" aria-describedby="del-why" aria-disabled="${deliverBlocked() ? "true" : "false"}">Zurückliefern starten</button>
   </div>`;
 }
 
@@ -626,6 +713,8 @@ function hvdelStep() {
     body = `${pics}
       <label class="field"><span>Titel</span><input class="inp" data-k="hvdel-title" data-hvdel-field="title" value="${esc(f.title)}" aria-label="Titel"></label>
       <label class="field"><span>Sendung (für den Dateinamen)</span><input class="inp" data-k="hvdel-show" data-hvdel-field="sendung" value="${esc(f.sendung)}" aria-label="Sendung"></label>
+      <label class="field"><span>VideoID${i.videoid_required ? " (Pflicht)" : ""}</span><input class="inp mono" data-k="hvdel-videoid" data-hvdel-field="videoid" value="${esc(f.videoid || "")}" aria-label="VideoID" maxlength="64" autocomplete="off" spellcheck="false" placeholder="z. B. aus der Sendeplanung" ${i.videoid_required ? 'aria-required="true"' : ""}>
+        <span class="hint">Steht im Sendefile im Clipnamen („VideoID Titel“) und im Dateinamen, wenn das Preset {videoid} nutzt.</span></label>
       <label class="field"><span>Preset</span><select class="inp" data-k="hvdel-preset" data-hvdel-field="preset" aria-label="Preset">${i.presets.map((p) => `<option value="${esc(p.id)}" ${sel(p.id, f.preset)}>${esc(p.name)} – ${esc(p.profil)}</option>`).join("")}</select></label>
       <h3 style="margin:8px 0 0;font-size:15px">Kanäle im Sendefile${i.profile ? ` (Spurprofil ${esc(i.profile)})` : ""}</h3>
       <table class="settab"><thead><tr><th scope="col">Kanäle</th><th scope="col">Spur</th><th scope="col">Exportname</th><th scope="col">Inhalt</th></tr></thead>
@@ -749,7 +838,7 @@ function dialogView() {
     const radio = (on, k, data, label) => `<button class="opt ${on ? "on" : ""}" role="radio" aria-checked="${on}" data-k="${k}" ${data}><span class="radio" aria-hidden="true"></span>${esc(label)}</button>`;
     return dialogFrame(`
       <h2 id="dlg-title">Übernahme aufheben</h2>
-      <span class="hint" id="dlg-text">Der Beitrag wird in Helmut freigegeben und entsperrt. Er steht danach wieder unter „Zur Mischung“; die Session bleibt liegen.</span>
+      <span class="hint" id="dlg-text">${folderMode() ? "Die Sperre im Filmordner wird aufgehoben." : "Der Beitrag wird in Helmut freigegeben und entsperrt."} Er steht danach wieder unter „Zur Mischung“; die Session bleibt liegen.</span>
       ${i.warn ? `<div class="banner warn" role="note">${esc(i.warn)}</div>` : ""}
       <h3 id="rel-grund">Grund</h3>
       <div role="radiogroup" aria-labelledby="rel-grund" style="display:flex;flex-direction:column;gap:8px">
@@ -1000,20 +1089,111 @@ function presetsBlock() {
 function webtriggerBlock() {
   const w = state.settings.wt;
   if (!w) return `<div role="status">Adressen werden erstellt …</div>`;
-  const roomSel = w.rooms.length ? `<div class="fieldrow"><label class="lbl" for="wt-room">Platz</label>
-    <select class="inp" id="wt-room" data-k="wt-room" data-wt-room="1">${w.rooms.map((r) => `<option value="${esc(r)}" ${r === w.room ? "selected" : ""}>${esc(r)}</option>`).join("")}</select></div>` : "";
-  const idRow = w.rooms.length ? `<div class="fieldrow"><span class="lbl">ID-Code für ${esc(w.room)}: ${w.id_code ? `<code>${esc(w.id_code)}</code>` : "keiner"}</span>
+  const idRow = `<div class="fieldrow"><span class="lbl">ID-Code dieses Macs: ${w.id_code ? `<code>${esc(w.id_code)}</code>` : "keiner"}</span>
     <div><button class="btn sm" data-k="wt-id-new" data-wt-id="neu">ID-Code erzeugen</button>
-    ${w.id_code ? '<button class="btn ghost sm" data-k="wt-id-del" data-wt-id="weg">ID-Code entfernen</button>' : ""}</div></div>` : "";
+    ${w.id_code ? '<button class="btn ghost sm" data-k="wt-id-del" data-wt-id="weg">ID-Code entfernen</button>' : ""}</div></div>`;
   const rows = w.rows.map((r, i) => `<tr><td>${esc(r.label)}</td><td><code>${esc(r.url)}</code></td>
     <td><button class="btn ghost sm" data-k="wt-copy-${i}" data-copy="${esc(r.url)}" aria-label="Adresse ${esc(r.label)} kopieren">Kopieren</button></td></tr>`).join("");
   return `<fieldset><legend>Adressen zum Kopieren</legend>
     <span class="hint">Für Stream Deck, Bitfocus Companion oder Skripte. Mit ID-Code hängt jede Adresse ?id=… an; die App führt den Befehl nur aus, wenn der Code zum Platz passt. ${esc(w.count_text)}.</span>
-    ${roomSel}${idRow}
+    ${idRow}
     <div><button class="btn sm" data-k="wt-copy-all" data-copy-all="1">Alle kopieren</button>
       <button class="btn ghost sm" data-k="wt-launcher" data-act="launcher">Launcher für das Stream Deck erzeugen</button></div>
     <span class="hint">Launcher sind kleine Apps je Befehl (im Stream Deck: System → Öffnen). Sie brauchen kein Netzwerk und laufen auch auf gesperrten Rechnern.</span>
     <table class="settab"><thead><tr><th scope="col">Aufruf</th><th scope="col">Adresse</th><th scope="col"><span class="sr-only">Kopieren</span></th></tr></thead><tbody>${rows}</tbody></table></fieldset>`;
+}
+
+// ── Zentrale und Chat (Plan Zentrale, 11.11.2026) ───────────────────────────
+function chatOn() {
+  const z = state.status && state.status.zentrale;
+  return !!(z && z.chat_aktiv);
+}
+
+function zentraleBlock() {
+  const z = state.settings.zentrale;
+  if (!z) return `<div role="status">Zentrale wird abgefragt …</div>`;
+  const central = (z.zentral_vorgegeben || []).length
+    ? `<dt>Zentral vorgegeben</dt><dd>${z.zentral_vorgegeben.map((k) => `<code>${esc(k)}</code>`).join(", ")}</dd>` : "";
+  return `${state.settings.zentraleError ? `<div class="banner warn" data-alert>${esc(state.settings.zentraleError)}</div>` : ""}<fieldset><legend>Verbindung</legend>
+    <dl class="kv"><dt>Stand</dt><dd>${esc(z.text)}</dd>
+    <dt>Anmeldung</dt><dd>${z.neu_anmelden ? "die Zentrale kennt diesen Mac nicht mehr – neu anmelden" : z.wartet ? `angemeldet an <code>${esc(z.gekoppelt_fuer)}</code> – wartet auf Zuordnung in der Administration` : z.gekoppelt ? `Raum „${esc(z.raum_zentrale)}“ an <code>${esc(z.gekoppelt_fuer)}</code> – gilt für alle Benutzer dieses Macs` : "noch nicht angemeldet"}</dd>
+    ${z.kennung ? `<dt>Code dieses Macs</dt><dd tabindex="-1" data-k="z-kennung"><strong class="mono" style="letter-spacing:2px" aria-hidden="true">${esc(z.kennung)}</strong><span class="sr-only">${esc([...z.kennung].join(" "))}</span>${z.wartet ? " – der Administration nennen; sie vergleicht ihn unter „Räume &amp; Geräte“" : ""}</dd>` : ""}
+    <dt>Raum dieses Macs</dt><dd>${esc(z.raum || "–")}${z.raum_ausstehend ? ` – die Zentrale führt ihn als „${esc(z.raum_ausstehend)}“; Ottilie übernimmt den Namen, sobald hier nichts mehr in Arbeit ist` : ""}</dd>${central}</dl>
+    ${z.adresse && (!z.gekoppelt || z.neu_anmelden) ? `<div class="buttons-row"><button class="btn sm" data-k="z-register" data-act="z-register" aria-describedby="z-register-hint">${z.neu_anmelden ? "Neu anmelden …" : "Ohne Code anmelden …"}</button></div>
+    <span class="hint" id="z-register-hint">Der Mac meldet sich bei der Zentrale an und wartet, bis die Administration ihn einem Raum zuordnet. macOS fragt einmal nach einem Administrator.</span>` : ""}
+    <div class="fieldrow"><label class="lbl" for="z-code">Kopplungscode</label>
+      <input class="inp" id="z-code" data-k="z-code" maxlength="8" autocomplete="one-time-code" style="text-transform:uppercase;letter-spacing:2px" aria-describedby="z-code-hint"></div>
+    <div class="buttons-row"><button class="btn sm" data-k="z-pair" data-act="z-pair" aria-describedby="z-code-hint" ${z.adresse ? "" : 'disabled'}>Koppeln …</button>
+      <button class="btn ghost sm" data-k="z-reconnect" data-act="z-reconnect" aria-describedby="z-code-hint" ${z.adresse ? "" : "disabled"}>Neu verbinden</button></div>
+    <span class="hint" id="z-code-hint">${z.adresse ? "Den Kopplungscode gibt die Administration der Zentrale aus (Räume &amp; Geräte). macOS fragt einmal nach einem Administrator – danach gilt die Kopplung für alle Benutzer dieses Macs." : "Erst weiter unten unter „Adresse der Zentrale“ eintragen (oder per Konfigurationsprofil vorgeben)."}</span></fieldset>`;
+}
+
+async function loadChat(quiet) {
+  try {
+    state.chat = await TM.call("chat", {});
+    if (!state.rooms) { try { state.rooms = await TM.call("raeume", {}); } catch (e) { /* ohne Raumliste */ } }
+    state.chatInfo = state.chat.chat;
+    const convs = state.chat.gespraeche || [];
+    const unread = state.chat.ungelesen || {};
+    if (state.chatJump) {                              // „Chat: n neu“: zum Gespräch mit Ungelesenem
+      state.chatJump = false;
+      const hit = convs.find((c) => unread[c.id]);
+      if (hit) state.chatConv = hit.id;
+    }
+    if (!state.chatConv || !convs.some((c) => c.id === state.chatConv)) state.chatConv = convs.length ? convs[0].id : "";
+    if (state.chatConv && state.view === "chat" && document.visibilityState !== "hidden" && (state.chat.ungelesen || {})[state.chatConv]) {
+      const r = await TM.call("chat_gelesen", { gespraech: state.chatConv });
+      state.chat.ungelesen = r.ungelesen;
+      refreshStatus();
+    }
+  } catch (e) { if (!quiet) toast(e.message, true); }
+  return render(quiet);
+}
+
+function chatView() {
+  const c = state.chat;
+  if (!c) return `<section class="content"><div role="status">Chat wird geladen …</div></section>`;
+  if (!c.chat || !c.chat.aktiv) return `<section class="content"><h1>Chat</h1><p class="hint">Der Chat ist in der Zentrale ausgeschaltet.</p></section>`;
+  const online = c.chat.verbunden !== false;
+  const draft = (state.chatDrafts || {})[state.chatConv] || "";
+  const urgentOn = !!(state.chatUrgent || {})[state.chatConv];
+  const convs = c.gespraeche || [];
+  const unread = c.ungelesen || {};
+  const msgs = (c.nachrichten || {})[state.chatConv] || [];
+  const rooms = ((state.rooms && state.rooms.cards) || []).map((r) => r.name).filter((n) => n !== c.raum);
+  const time = (t) => new Date(t * 1000).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const list = convs.map((v) => `<button class="side-item ${v.id === state.chatConv ? "on" : ""}" data-k="chat-c-${esc(v.id)}" data-act="chat-conv" data-conv="${esc(v.id)}" ${v.id === state.chatConv ? 'aria-current="true"' : ""}>
+      <span>${esc(v.titel)}</span>${unread[v.id] ? `<span class="count" aria-label="${unread[v.id]} ungelesen">${unread[v.id]}</span>` : ""}</button>`).join("");
+  const arten = c.chat.arten || {};
+  return `<section class="content" aria-labelledby="chat-h"><h1 id="chat-h" style="display:flex;align-items:center;gap:10px"><img src="ottilie.png" alt="" width="32" height="32">Chat</h1>
+    <div style="display:grid;grid-template-columns:240px 1fr;gap:16px">
+      <div>${list || '<p class="hint">Keine Gespräche</p>'}
+        ${arten.raum !== false ? `<div class="fieldrow"><label class="lbl" for="chat-room">Gespräch mit</label><select class="inp" id="chat-room" data-k="chat-room"><option value="">Raum wählen …</option>${rooms.map((n) => `<option>${esc(n)}</option>`).join("")}</select></div>
+        <button class="btn ghost sm" data-k="chat-open" data-act="chat-open">Gespräch öffnen</button>` : ""}</div>
+      <div>${online ? "" : `<div class="banner warn" role="status">Zentrale nicht erreichbar – Nachrichten können gerade nicht gesendet werden. Ottilie verbindet sich selbst neu.</div>`}
+        ${state.chatConv ? `<div class="banner info" role="note">${esc(c.chat.hinweis || "")}</div>
+        <ol class="chatlist" aria-live="polite" aria-label="Nachrichten" style="list-style:none;padding:0;max-height:55vh;overflow:auto">${msgs.map((m) => `<li style="margin:6px 0;padding:6px 10px;border:1px solid var(--line);border-radius:8px;${m.von === c.raum ? "margin-left:15%;" : "margin-right:15%;"}${m.dringend ? "border-color:var(--danger,#b3261e);" : ""}">
+          <div class="hint">${m.system ? '<img src="ottilie.png" alt="" width="16" height="16" style="vertical-align:-3px;margin-right:4px">Ottilie' : esc(m.von)} · ${time(m.zeit)}${m.dringend ? " · dringend" : ""}</div>${esc(m.text)}</li>`).join("")}</ol>
+        <div class="fieldrow"><label class="lbl" for="chat-text">Nachricht</label><textarea class="inp" id="chat-text" data-k="chat-text" maxlength="2000" rows="2">${esc(draft)}</textarea></div>
+        <div class="buttons-row"><label><input type="checkbox" id="chat-dringend" data-k="chat-dringend" ${urgentOn ? "checked" : ""}> dringend</label>
+          <button class="btn sm" data-k="chat-send" data-act="chat-send" ${online ? "" : 'aria-disabled="true"'}>Senden</button></div>` : '<p class="hint">Kein Gespräch gewählt.</p>'}</div>
+    </div></section>`;
+}
+
+function folderBlock() {
+  const f = state.settings.folder;
+  if (!f) return `<div role="status">Übergabeordner wird geprüft …</div>`;
+  const where = f.ordner ? `<code>${esc(f.ordner)}</code>` : "kein Ordner eingestellt";
+  const ok = f.erreichbar ? (f.beschreibbar ? "erreichbar und beschreibbar" : "erreichbar, aber nur lesbar") : "nicht erreichbar";
+  const n = f.filme || {};
+  const films = f.erreichbar ? `${n.bereit || 0} bereit · ${n.unvollstaendig || 0} unvollständig · ${n.wird_uebertragen || 0} werden übertragen` : "";
+  return `${state.settings.folderError ? `<div class="banner warn" data-alert>${esc(state.settings.folderError)}</div>` : ""}<fieldset><legend>Stand</legend>
+    <dl class="kv"><dt>Betriebsart</dt><dd>${esc(f.betriebsart_text)}</dd>${f.netzadresse ? `<dt>Netzadresse</dt><dd><code>${esc(f.netzadresse)}</code> – Ottilie bindet die Freigabe selbst ein</dd>` : ""}<dt>Ordner</dt><dd>${where} – ${ok}</dd>
+    ${films ? `<dt>Filme</dt><dd>${films}</dd>` : ""}${f.meldung ? `<dt>Hinweis</dt><dd>${esc(f.meldung)}</dd>` : ""}
+    ${(f.ordner_liste || []).length ? `<dt>Alle Übergabeordner</dt><dd><ul class="plain">${f.ordner_liste.map((o) => `<li>${esc(o.name)}: ${o.netzadresse ? `<code>${esc(o.netzadresse)}</code>` : `<code>${esc(o.ordner || "–")}</code>`} – ${o.erreichbar ? `erreichbar, ${o.filme} ${o.filme === 1 ? "Film" : "Filme"}` : `nicht erreichbar${o.meldung ? ` (${esc(o.meldung)})` : ""}`}</li>`).join("")}</ul></dd>` : ""}
+    <dt>Fertigmeldung</dt><dd>${f.fertigmeldung.aktiv ? (f.fertigmeldung.url ? `an <code>${esc(f.fertigmeldung.url)}</code>` : "an, aber keine Adresse") : "aus"}</dd></dl>
+    <div><button class="btn sm" data-k="fm-test" data-act="fm-test" aria-describedby="fm-test-hint" ${f.fertigmeldung.aktiv && f.fertigmeldung.url ? "" : 'aria-disabled="true"'}>Testmeldung senden</button></div>
+    <span class="hint" id="fm-test-hint">${f.fertigmeldung.aktiv && f.fertigmeldung.url ? "Schickt eine Probemeldung an die Adresse oben. Sie gilt als Test, nicht als Lieferung." : "Erst „Fertigmeldung senden“ einschalten und eine Adresse eintragen."}</span></fieldset>`;
 }
 
 function vocasterBlock() {
@@ -1153,26 +1333,6 @@ async function tplCall(cmd, args) {
   state.settings.tplDel = null; render();
 }
 
-function roomsBlock() {                           // Räume über Mac-Namen (Plan Nutzer & Räume, Schritt 4)
-  const r = state.settings.rooms;
-  if (!r) return `<fieldset><legend>Räume</legend><div role="status">Lade …</div></fieldset>`;
-  const macOpt = (cur) => `<option value="" ${cur ? "" : "selected"}>– Mac wählen –</option>` +
-    r.macs.map((m) => `<option value="${esc(m)}" ${m === cur ? "selected" : ""}>${esc(m)}${m === r.this_mac ? " (dieser Mac)" : ""}</option>`).join("");
-  const rows = r.rows.map((x, i) => `<tr>
-      <td><input class="inp sm" data-k="room-name-${i}" data-room="${i}" data-rkey="name" value="${esc(x.name || "")}" aria-label="Raumname, Zeile ${i + 1}"></td>
-      <td><select class="inp sm" data-k="room-mac-${i}" data-room="${i}" data-rkey="rechnername" aria-label="Mac, Zeile ${i + 1}">${macOpt(x.rechnername || "")}</select></td>
-      <td><input class="inp sm" data-k="room-code-${i}" data-room="${i}" data-rkey="id_code" value="${esc(x.id_code || "")}" aria-label="ID-Code, Zeile ${i + 1}"></td>
-      <td><button class="btn ghost sm" data-k="room-del-${i}" data-act="room-del" data-idx="${i}" aria-label="Zeile ${i + 1} entfernen">Entfernen</button></td></tr>`).join("");
-  return `<fieldset><legend>Räume</legend>
-    <span class="hint">Ein Raum ist ein Mac. Dieser Mac: <strong>${esc(r.this_mac)}</strong> – Raum „${esc(r.this_room)}“. Zur Auswahl stehen dieser Mac und die Macs, auf denen Ottilie gerade läuft. Die Liste liegt in der Ablage der Nutzer (${esc(r.ablage)}) – im gemeinsamen Ordner gilt sie für alle Räume.</span>
-    <table class="settab"><thead><tr><th scope="col">Raum</th><th scope="col">Mac</th><th scope="col">ID-Code (Webtrigger, optional)</th><th scope="col"><span class="sr-only">Aktion</span></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="4" class="hint">Noch keine Räume.</td></tr>`}</tbody></table>
-    <div style="display:flex;gap:8px"><button class="btn sm" data-k="room-add" data-act="room-add">Raum hinzufügen</button>
-      <button class="btn sm pri" data-k="room-save" data-act="room-save">Räume speichern</button></div>
-    ${r.errors.length ? `<div class="banner warn" data-alert>${r.errors.map(esc).join("<br>")}</div>` : ""}
-    ${r.message ? `<div role="status" class="hint">${esc(r.message)}</div>` : ""}</fieldset>`;
-}
-
 function usersBlock() {
   const u = state.users || { users: [] };
   const ed = state.settings.usrEdit || {};
@@ -1208,59 +1368,21 @@ async function usersCall(cmd, args) {
   render();
 }
 
+// Vorauswahl im Anmeldedialog: angemeldeter oder Standard-Nutzer nur, wenn es ihn hier gibt (live 13.11.2026: Standard
+// „jens“ aus der Entwicklungsfassung, die installierte App kannte nur „admin“ – Anmelden meldete „Nutzer nicht gefunden“)
+function loginChoice(u) {
+  const ids = (u.users || []).map((x) => x.id);
+  return [u.current && u.current.id, u.standard].find((id) => id && ids.includes(id)) || ids[0] || "";
+}
+
 async function openLogin(message) {
   try { state.users = await TM.call("nutzer"); } catch (e) { toast(e.message, true); return; }
   const u = state.users;
-  state.dialog = { kind: "login", sel: (u.current && u.current.id) || u.standard || (u.users[0] && u.users[0].id) || "",
-                   std: false, newName: "", message: message || "" };
+  state.dialog = { kind: "login", sel: loginChoice(u), std: false, newName: "", message: message || "" };
   state.dialog.std = !!state.dialog.sel && u.standard === state.dialog.sel;
   render();
 }
 
-function transferBlock() {
-  const t = state.settings.transfer || {};
-  const im = t.import;
-  let pick = "";
-  if (im && im.choices.length) {
-    const all = im.choices.every((c) => im.sel[c.id]);
-    const status = { neu: "neu", ersetzt: "ersetzt das vorhandene Profil", gleich: "unverändert" };
-    const rows = im.choices.map((c, i) => `<label class="chk"><input type="checkbox" data-k="tr-${i}" data-tr-pick="${esc(c.id)}" ${im.sel[c.id] ? "checked" : ""}>
-      <span><strong>${esc(c.area)}</strong> · ${esc(c.title)} – ${c.status ? esc(status[c.status] || c.status) : `${c.count} Werte, ${c.changed} anders als hier`}${c.locked ? `, ${c.locked} gesperrt (Geräteverwaltung)` : ""}</span></label>`).join("");
-    pick = `<div class="banner info prof-imp" role="group" aria-labelledby="tr-title"><strong id="tr-title">Aus „${esc(im.path.split("/").pop())}“ importieren – was soll übernommen werden?</strong>
-      <label class="chk"><input type="checkbox" data-k="tr-all" data-tr-all="1" ${all ? "checked" : ""}><span>Alles</span></label>
-      ${rows}
-      ${im.unknown && im.unknown.length ? `<span class="hint">${im.unknown.length} Werte kennt diese Version nicht – sie werden übergangen.</span>` : ""}
-      <span class="hint">„Nur für einen Mac“ (Ordner, Aufnahmespuren, Stream Deck, Raum) ist nicht vorgewählt.</span>
-      <div><button class="btn sm" data-k="tr-ok" data-tr-act="ok">Gewähltes übernehmen</button>
-        <button class="btn ghost sm" data-k="tr-no" data-tr-act="ab">Abbrechen</button></div></div>`;
-  }
-  return `<fieldset><legend>Einstellungen übertragen</legend>
-    <span class="hint">Exportiert alles, was auf diesem Mac eingestellt ist – auch Spurprofile und Exportnamen –, als Datei; Zugangsdaten liegen nur im Schlüsselbund und sind nicht dabei. Beim Import wählen Sie, was übernommen wird.</span>
-    <div class="buttons-row"><button class="btn sm" data-k="tr-exp" data-tr-act="exportieren">Alle Einstellungen exportieren …</button>
-      <button class="btn sm" data-k="tr-imp" data-tr-act="importieren">Einstellungen importieren …</button></div>
-    ${t.message ? `<div role="status" class="hint">${esc(t.message)}</div>` : ""}
-    ${pick}</fieldset>`;
-}
-
-async function transferAction(act) {
-  const t = state.settings.transfer = state.settings.transfer || {};
-  try {
-    if (act === "exportieren") { t.message = (await TM.call("einstellungen_exportieren", {})).message; t.import = null; }
-    else if (act === "importieren") {
-      const im = await TM.call("einstellungen_import_pruefen", {});
-      im.sel = Object.fromEntries(im.choices.map((c) => [c.id, c.default]));
-      t.import = im.choices.length ? im : null;
-      t.message = im.message || "";
-    } else if (act === "ab") { t.import = null; t.message = "Import abgebrochen"; }
-    else if (act === "ok") {
-      const im = t.import;
-      t.message = (await TM.call("einstellungen_importieren", { pfad: im.path, auswahl: Object.keys(im.sel).filter((k) => im.sel[k]) })).message;
-      t.import = null;
-    }
-    if (t.message) Live.say(t.message);
-  } catch (e) { toast(e.message, true); }
-  render();
-}
 
 const CUSTOM_FIELDS = new Set(["aufnahme.presets", "import.spurprofile", "aufnahme.audio_verschieben.quellspuren",
   "aufnahme.audio_verschieben.zielspuren"]);
@@ -1271,9 +1393,9 @@ function settingsView() {
     <div role="tablist" aria-labelledby="area-${esc(a.id)}" aria-orientation="vertical">${a.sections.map((x) => `<button class="tab ${st.sectionId === x.id ? "on" : ""}" role="tab"
       aria-selected="${st.sectionId === x.id}" data-k="sec-${esc(x.id)}" data-sec="${esc(x.id)}">${esc(x.title)}</button>`).join("")}</div>`).join("");
   const sec = st.section;
-  const form = !sec ? `<div role="status">Lade …</div>` : `<h1 id="set-title">${esc(sec.area)} · ${esc(sec.title)}</h1>
+  const form = !sec ? `<div role="status">Lade …</div>` : `<h1 id="set-title" tabindex="-1" data-k="view-title">${esc(sec.area)} · ${esc(sec.title)}</h1>
     <span class="hint">Änderungen gelten sofort und werden auf diesem Mac gespeichert. Von der Geräteverwaltung festgelegte Werte sind gesperrt.</span>
-    ${sec.id === "aufnahme.spuren" ? gridBlock() : ""}${sec.id === "aufnahme.audio_verschieben" ? moveBlock() : ""}${sec.id === "aufnahme" ? presetsBlock() : ""}${sec.id === "system.streamdeck_webtrigger" ? webtriggerBlock() : ""}${sec.id === "system.vocaster" ? vocasterBlock() : ""}${sec.id === "import.spurprofile" ? profileBlock() : ""}${sec.id === "system.einstellungen_uebertragen" ? transferBlock() : ""}${sec.id === "system.raeume_nutzer" ? roomsBlock() + usersBlock() : ""}${sec.id === "persoenlich" ? templatesBlock() : ""}${sec.id === "system.ueber" ? aboutBlock() : ""}
+    ${sec.id === "aufnahme.spuren" ? gridBlock() : ""}${sec.id === "aufnahme.audio_verschieben" ? moveBlock() : ""}${sec.id === "aufnahme" ? presetsBlock() : ""}${sec.id === "system.streamdeck_webtrigger" ? webtriggerBlock() : ""}${sec.id === "system.vocaster" ? vocasterBlock() : ""}${sec.id === "import.spurprofile" ? profileBlock() : ""}${sec.id === "system.raeume_nutzer" ? usersBlock() : ""}${sec.id === "persoenlich" ? templatesBlock() : ""}${sec.id === "system.ueber" ? aboutBlock() : ""}${sec.id === "system.uebergabeordner" ? folderBlock() : ""}${sec.id === "system.zentrale" ? zentraleBlock() : ""}
     ${sec.groups.map((g) => { const fields = g.fields.filter((f) => !CUSTOM_FIELDS.has(f.path)); return g.title ? `<fieldset><legend>${esc(g.title)}</legend>${fields.map(fieldRow).join("")}</fieldset>` : fields.map(fieldRow).join(""); }).join("")}`;
   return `<main class="settings" aria-label="Einstellungen"><nav class="set-nav" aria-label="Bereiche der Einstellungen">${nav}</nav>
     <div class="set-form" role="tabpanel" aria-labelledby="set-title">${form}</div></main>`;
@@ -1296,7 +1418,8 @@ async function openSettings(sectionId) {
     if (id === "import.spurprofile") { state.settings.prof = null; state.settings.profConfirm = false; render(); state.settings.prof = await TM.call("spurprofile", {}); }
     if (id === "persoenlich") state.settings.tpl = await TM.call("vorlagen", {});
     if (id === "system.ueber") state.settings.about = await TM.call("ueber", {});
-    if (id === "system.raeume_nutzer") { const r = await TM.call("raumliste", {}); state.settings.rooms = { ...r, rows: r.rooms.map((x) => ({ ...x })) }; }
+    if (id === "system.uebergabeordner") { state.settings.folder = null; render(); state.settings.folder = await TM.call("uebergabeordner", {}); }
+    if (id === "system.zentrale") { state.settings.zentrale = null; render(); state.settings.zentrale = await TM.call("zentrale", {}); }
   } catch (e) { toast(e.message, true); }
   render();
 }
@@ -1347,7 +1470,18 @@ async function saveSetting(path, value) {
       const c = state.settings.prof.chosen;
       state.settings.prof = await TM.call("spurprofile", { gruppe: c.group, name: c.name });
     }
-  } catch (e) { toast(e.message, true); }
+    if (path.startsWith("system.uebergabeordner.") && !view.errors.length) {    // Betriebsart: sofort überall zeigen
+      state.settings.folderError = "";
+      await refreshStatus(true);
+      state.list = null;
+      try { state.settings.folder = await TM.call("uebergabeordner", {}); } catch (e) { /* Block bleibt */ }
+      if (path.endsWith(".betriebsart")) Live.say(`Betriebsart: ${state.status ? state.status.betriebsart_text : ""} – Liste wird neu eingelesen`);
+      loadList(true);
+    }
+  } catch (e) {
+    if (path.endsWith(".betriebsart") && state.settings) state.settings.folderError = e.message;
+    toast(e.message, true);
+  }
   render();
 }
 
@@ -1428,26 +1562,35 @@ function render(quiet = false) {
   const sel = active && active.id === "q" ? [active.selectionStart, active.selectionEnd] : null;
   const st = state.status;
   const center = state.error ? `<main class="main"><div class="placeholder error" data-alert>${esc(state.error)}</div></main>`
-    : (state.flow ? flowView() : (state.settings ? settingsView() : (state.view === "rooms" ? roomsView() : (state.view === "history" ? historyView() : listView() + detailView()))));
+    : (state.flow ? flowView() : (state.settings ? settingsView() : (state.view === "rooms" ? roomsView() : (state.view === "history" ? historyView() : (state.view === "chat" ? chatView() : listView() + detailView())))));
   const parts = {
     top: topbar(st), body: `<div class="body">${nav()}${center}</div>`, dlg: dialogView(),
     toast: state.toast ? `<div class="toast ${state.toast.err ? "err" : ""}" aria-hidden="true">${esc(state.toast.text)}</div>` : "",
   };
   const root = document.getElementById("root");
   const snap = viewSnap();
+  const chatBox = document.activeElement && document.activeElement.id === "chat-text" ? document.activeElement : null;
+  const chatSel = chatBox ? [chatBox.selectionStart, chatBox.selectionEnd] : null;
   for (const name of REGIONS) {
     const host = regionHost(root, name);
     if (quiet && parts[name] === lastHtml[name]) continue;
     // Takt-Neuzeichnen nicht mitten in eine Eingabe: ein noch nicht übernommener Wert ginge verloren (Review B32)
     const typing = document.activeElement;
     if (quiet && host.contains(typing) && typing.matches("input, textarea") && typing.id !== "q"
-        && typing.value !== typing.defaultValue) continue;
+        && typing.id !== "chat-text" && typing.value !== typing.defaultValue) continue;
     lastHtml[name] = parts[name];
     const scroll = saveScroll(host, shownSnap);
     host.innerHTML = parts[name];
     restoreScroll(host, scroll, snap);
   }
   shownSnap = snap;
+  if (chatSel) {                                   // Chat: Fokus und Schreibmarke nach dem Neuzeichnen zurück
+    const box = document.getElementById("chat-text");
+    if (box && document.activeElement !== box) { box.focus(); try { box.setSelectionRange(chatSel[0], chatSel[1]); } catch (e) { /* egal */ } }
+  }
+  // „aktualisiert hh:mm“ außerhalb des HTML-Vergleichs – sonst zeichnete jeder Takt die Liste neu (Fokus, VoiceOver)
+  const stampEl = document.getElementById("list-stamp");
+  if (stampEl && !state.listBusy) stampEl.textContent = state.list && state.list.aktualisiert ? `aktualisiert ${state.list.aktualisiert.slice(0, 5)}` : "";
   const dlg = document.querySelector(".dialog");
   if (dlg && !state.dialogShown) {
     state.dialogShown = true;             // Dialog neu: Fokus einmal hinein
@@ -1498,8 +1641,10 @@ function focusFirst(root) {
 }
 
 // ── Daten ───────────────────────────────────────────────────────────────────
-async function loadList(quiet) {
+async function loadList(quiet, loud) {
   quiet = quiet === true;                 // auch als Ereignis-Handler benutzt
+  // Im Takt keine Fehler-Toasts: die Titelleiste zeigt den Ausfall; nur nach Klick oder ⌘R melden (Mischer-Prüfung)
+  const report = (e) => { if (!quiet || loud === true) toast(e.message, true); };
   if (state.view === "rooms") {
     try { state.rooms = await TM.call("raeume", {}); } catch (e) { toast(e.message, true); }
     return render(quiet);
@@ -1508,12 +1653,14 @@ async function loadList(quiet) {
     try { state.history = await TM.call("mischungen", {}); } catch (e) { toast(e.message, true); }
     return render(quiet);
   }
+  if (state.view === "chat") return loadChat(quiet);
   try {
-    state.list = await TM.call("list", { query: state.query, order: state.order });
+    const now = state.listNow; state.listNow = false;
+    state.list = await TM.call("list", { query: state.query, order: state.order, sofort: !!now });
     const ids = state.list.rows.map((r) => r.id);
     if (!ids.includes(state.selected)) state.selected = ids[0] || null;
     await loadDetail();
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { report(e); }
   render(quiet);
 }
 
@@ -1564,28 +1711,43 @@ async function openFlow(fresh) {
 
 async function openDeliver() {
   const d = state.detail;
-  state.flow = { kind: "deliver", id: d.id, title: d.title, step: "overview", info: null, sel: {} };
+  state.flow = { kind: "deliver", id: d.id, title: d.title, step: "overview", info: null, sel: {}, videoid: "" };
   render();
   try {
     const info = await TM.call("zurueckliefern_info", { id: d.id });
     state.flow.info = info;
     state.flow.sel = Object.fromEntries(info.tracks.map((t) => [t, true]));
+    state.flow.videoid = info.videoid || "";
   } catch (e) { toast(e.message, true); }
   render();
-  const el = document.getElementById("del-tracks"); if (el) el.focus();
+  const i = state.flow.info;
+  const first = i && i.videoid_required && !i.videoid ? "del-videoid" : "del-tracks";   // erst, was fehlt
+  const el = document.getElementById(first) || document.getElementById("del-tracks"); if (el) el.focus();
 }
 
 async function startDeliver() {
   const f = state.flow;
+  if (f.starting) return;                 // Enter und Klick zugleich: nur einmal
+  const why = deliverBlocked();
+  if (why) {
+    toast(why, true);
+    const el = document.getElementById(why.includes("VideoID") ? "del-videoid" : "del-tracks"); if (el) el.focus();
+    return;
+  }
   try {
     const i = f.info;
     const order = i.session_tracks.concat(i.tracks.filter((t) => !i.session_tracks.includes(t)));
-    state.job = await TM.call("zurueckliefern", { id: f.id, tracks: order.filter((t) => f.sel[t]) });
+    const args = { id: f.id, tracks: order.filter((t) => f.sel[t]) };
+    if (i.videoid_ask) args.videoid = f.videoid;
+    if (i.neue_fassung) args.neue_fassung_ok = !!f.newOk;
+    f.starting = true;
+    state.job = await TM.call("zurueckliefern", args);
     f.step = "job";
     render();
     const h = document.querySelector(".progress-box h2");
     if (h) { h.tabIndex = -1; h.focus(); }
   } catch (e) { toast(e.message, true); }
+  finally { f.starting = false; }
 }
 
 async function hvCheck() {
@@ -1634,6 +1796,44 @@ function closeFlow() {
 
 // ── Aufträge und Fragen ─────────────────────────────────────────────────────
 TM.on("job", (j) => onJob(j));
+// Entwurf und „dringend“ je Gespräch merken – Neuzeichnen beim Eintreffen einer Nachricht verliert nichts (Mischer)
+document.addEventListener("input", (ev) => {
+  if (ev.target && ev.target.id === "chat-text") (state.chatDrafts = state.chatDrafts || {})[state.chatConv] = ev.target.value;
+});
+document.addEventListener("change", (ev) => {
+  if (ev.target && ev.target.id === "chat-dringend") (state.chatUrgent = state.chatUrgent || {})[state.chatConv] = ev.target.checked;
+});
+// Zentrale: Verbindung, Einstellungen, Chat (nur im Arbeitsspeicher der App)
+TM.on("zentrale", async () => {
+  const z0 = state.status && state.status.zentrale, r0 = state.status && state.status.room;
+  await refreshStatus(true);
+  const z1 = state.status && state.status.zentrale, r1 = state.status && state.status.room;
+  if (z0 && z1 && z0.zustand === "wartet" && z1.zustand === "verbunden") Live.say(`Zentrale: zugeordnet, Raum ${r1}`);
+  else if (z0 && z1 && z0.zustand !== z1.zustand && !["verbindet", "getrennt"].includes(z1.zustand)) Live.say(z1.text, z1.zustand === "abgemeldet");
+  if (r0 && r1 && r0 !== r1) Live.say(`Raum dieses Macs heißt jetzt ${r1}`);
+  if (state.view === "chat" && !chatOn()) { state.view = "list"; render(); }
+  else if (state.view === "chat") loadChat(true);
+  if (state.settings && state.settings.sectionId === "system.zentrale") {
+    try { state.settings.zentrale = await TM.call("zentrale", {}); render(true); } catch (e) { /* bleibt */ }
+  }
+});
+TM.on("chat", (d) => {
+  if (state.view === "chat") loadChat(true); else refreshStatus(true);
+  const m = d && d.neu;
+  if (m && m.von !== (state.chat && state.chat.raum)) {
+    const who = m.system ? "Ottilie" : m.von;
+    const text = String(m.text || "").slice(0, 80);
+    if (m.dringend) Live.say(`Dringende Nachricht von ${who}: ${text}`, true);
+    else if (state.view === "chat") Live.say(`Neue Nachricht von ${who}: ${text}`);
+  }
+});
+TM.on("raumstatus", () => { if (state.view === "rooms") loadList(true); });
+TM.on("zentrale_neuer_beitrag", () => {
+  const again = () => { if (state.view === "list" && !state.flow && !state.settings) loadList(true); };
+  again();
+  setTimeout(again, 5000);                         // Wartezeit dieses Macs (Uhr, Einstellung) abwarten
+});
+TM.on("zentrale_systemmeldung", (d) => { if (d && d.text) toast(d.text); });
 function onJob(j) {
   state.job = j;
   Live.job(j);
@@ -1694,7 +1894,7 @@ async function answer(value) {
 // ── Bedienung ───────────────────────────────────────────────────────────────
 // Doppelklick löst eine Aktion nicht zweimal aus (Review A15: Duplizieren legte zwei Duplikate an): solange die
 // Aktion eines Knopfs (`data-k`) noch läuft, bleiben weitere Klicks auf ihn ohne Wirkung.
-const CLICKABLE = "[data-view],[data-pick],[data-act],[data-reason],[data-keep],[data-order],[data-purpose],[data-mode],[data-ntdrop],[data-ntdrophv],[data-bakopen],[data-bakreveal],[data-roomrel],[data-hvassign],[data-tpl],[data-answer],[data-clip],[data-tab],[data-move],[data-sec],[data-reset],[data-add-row],[data-del-row],[data-grid-read],[data-mv-read],[data-mv-add],[data-mv-del],[data-prof-act],[data-prof-del],[data-tr-act],[data-preset-act],[data-copy],[data-copy-all],[data-wt-id]";
+const CLICKABLE = "[data-view],[data-pick],[data-act],[data-reason],[data-keep],[data-order],[data-purpose],[data-mode],[data-ntdrop],[data-ntdrophv],[data-bakopen],[data-bakreveal],[data-roomrel],[data-hvassign],[data-tpl],[data-answer],[data-clip],[data-tab],[data-move],[data-sec],[data-reset],[data-add-row],[data-del-row],[data-grid-read],[data-mv-read],[data-mv-add],[data-mv-del],[data-prof-act],[data-prof-del],[data-preset-act],[data-copy],[data-copy-all],[data-wt-id]";
 const runningClicks = new Set();
 document.addEventListener("click", async (ev) => {
   const t = ev.target.closest(CLICKABLE);
@@ -1714,7 +1914,7 @@ async function onClick(ev, t) {
     return;
   }
   if (t.dataset.wtId) {
-    try { state.settings.wt = await TM.call(t.dataset.wtId === "neu" ? "id_code_erzeugen" : "id_code_entfernen", { raum: state.settings.wt.room });
+    try { state.settings.wt = await TM.call(t.dataset.wtId === "neu" ? "id_code_erzeugen" : "id_code_entfernen", {});
       Live.say(state.settings.wt.id_code ? `ID-Code ${state.settings.wt.id_code} gesetzt` : "ID-Code entfernt"); }
     catch (e) { toast(e.message, true); }
     return render();
@@ -1741,7 +1941,6 @@ async function onClick(ev, t) {
     }
     return profileCall(act === "lesen" ? "spurprofil_lesen" : "spurprofil_entfernen", {});
   }
-  if (t.dataset.trAct) return transferAction(t.dataset.trAct);
   if (t.dataset.profDel) return profileCall("spurprofil_spur_entfernen", { spur: t.dataset.profDel });
   if (t.dataset.mvRead) {
     try { setMove(await TM.call("audio_verschieben", { lesen: true }), true); Live.say(state.settings.move.meldung); }
@@ -1925,17 +2124,6 @@ async function onClick(ev, t) {
     render();
   }
   else if (act === "show-question") { state.dialog = null; state.preview = null; onJob(state.job); }
-  else if (act === "room-add") { state.settings.rooms.rows.push({ name: "", rechnername: "", id_code: "" }); render(); }
-  else if (act === "room-del") { state.settings.rooms.rows.splice(Number(t.dataset.idx), 1); render(); }
-  else if (act === "room-save") {
-    try {
-      const r = await TM.call("raumliste_speichern", { rooms: state.settings.rooms.rows });
-      state.settings.rooms = { ...r, rows: r.errors.length ? state.settings.rooms.rows : r.rooms.map((x) => ({ ...x })) };
-      if (!r.errors.length) await refreshStatus();
-      Live.say(r.errors.length ? r.errors.join(" ") : r.message, !!r.errors.length);
-    } catch (e) { toast(e.message, true); }
-    render();
-  }
   else if (act === "open-link") { try { await TM.call("link_oeffnen", { url: t.dataset.url }); } catch (e) { toast(e.message, true); } }
   else if (act === "tpl-up") { await tplCall("vorlage_hochladen"); }
   else if (act === "tpl-std") { await tplCall("vorlage_standard", { id: t.dataset.id }); }
@@ -1978,7 +2166,7 @@ async function onClick(ev, t) {
       .concat(Object.entries(f.usb).filter(([mount, v]) => v && f.info.usb.some((u) => u.mount === mount)).map(([mount]) => ({ art: "usb", mount, name: (f.info.usb.find((u) => u.mount === mount) || {}).name })))
       .concat(f.ordner.map((p) => ({ art: "ordner", pfad: p })));
     try {
-      state.job = await TM.call("havarie_ausliefern", { path: f.path, bild: f.bild, preset: f.preset, title: f.title, sendung: f.sendung, ziele });
+      state.job = await TM.call("havarie_ausliefern", { path: f.path, bild: f.bild, preset: f.preset, title: f.title, sendung: f.sendung, videoid: f.videoid || "", ziele });
       f.step = "job"; f.jobId = state.job.id; render();
     } catch (e) { toast(e.message, true); }
   }
@@ -2021,13 +2209,14 @@ async function onClick(ev, t) {
   }
   else if (act === "hist-clear") {
     const n = state.history ? state.history.anzahl : 0;
-    return askConfirm(t, "Liste leeren", `${n} Einträge werden aus dem Verzeichnis dieses Macs entfernt. Helmut, Sessions und Dateien bleiben, wie sie sind.`,
+    return askConfirm(t, "Liste leeren", `${n} Einträge werden aus dem Verzeichnis dieses Macs entfernt – für alle Benutzer dieses Macs. Helmut, Sessions und Dateien bleiben, wie sie sind.`,
       "Liste leeren", ["mischungen_leeren", {}], async () => { state.history = await TM.call("mischungen", {}); });
   }
   else if (act === "nt-drop-all") {
     const n = (state.status && state.status.nachtrag) || {};
     const count = (n.offen || 0) + (n.konflikte || []).length;
-    return askConfirm(t, "Alle Nachträge verwerfen", `${count} Änderung${count === 1 ? "" : "en"} (offen und Konflikte, dazu Havarie-Sessions ohne Beitrag) werden nicht in Helmut nachgetragen. Helmut bleibt, wie es ist.`,
+    const others = (n.fremde || []).length ? ` Darunter Änderungen anderer Benutzer dieses Macs (${n.fremde.join(", ")}) – auch deren Fertigmeldungen gehen dann nie hinaus.` : "";
+    return askConfirm(t, "Alle Nachträge verwerfen", `${count} Änderung${count === 1 ? "" : "en"} (offen und Konflikte, dazu Havarie-Sessions ohne Beitrag) werden nicht nachgetragen. Helmut bzw. der Übergabeordner bleibt, wie es ist.${others}`,
       "Alle verwerfen", ["nachtrag_verwerfen", { alle: true }]);
   }
   else if (act === "confirm-ok") {
@@ -2037,6 +2226,76 @@ async function onClick(ev, t) {
     await refreshStatus();
     if (g.after) await g.after();
     return render();
+  }
+  else if (act === "list-refresh") {
+    return refreshList();
+  }
+  else if (act === "z-pair") {
+    const code = (document.getElementById("z-code") || {}).value || "";
+    if (!code.trim()) return toast("Kopplungscode eingeben", true);
+    try {
+      const r = await TM.call("zentrale_koppeln", { code });
+      state.settings.zentrale = r; state.settings.zentraleError = ""; toast(r.meldung);
+    } catch (e) { state.settings.zentraleError = e.message; }
+    await refreshStatus();
+    return render();
+  }
+  else if (act === "z-register") {
+    try {
+      const r = await TM.call("zentrale_anmelden", {});
+      state.settings.zentrale = r; state.settings.zentraleError = ""; toast(r.meldung);
+    } catch (e) { state.settings.zentraleError = e.message; }
+    await refreshStatus();
+    render();
+    // Der Knopf verschwindet – Fokus auf den Code, den die Administration vergleicht (Barrierefreiheit 13.11.2026)
+    const k = document.querySelector('[data-k="z-kennung"]');
+    if (k) k.focus();
+    return;
+  }
+  else if (act === "z-reconnect") {
+    try { const r = await TM.call("zentrale_neu_verbinden", {}); if (state.settings) state.settings.zentrale = r; } catch (e) { toast(e.message, true); }
+    return render();
+  }
+  else if (act === "chat-unread") {
+    state.chatJump = true; state.flow = null; state.settings = null; state.view = "chat";
+    return loadChat(false);
+  }
+  else if (act === "chat-conv") {
+    state.chatConv = t.dataset.conv;
+    return loadChat(false);
+  }
+  else if (act === "chat-open") {
+    const sel = document.getElementById("chat-room");
+    if (!sel || !sel.value) return toast("Raum wählen", true);
+    try { const r = await TM.call("chat_oeffnen", { mit: sel.value }); if (r.id) state.chatConv = r.id; } catch (e) { toast(e.message, true); }
+    return loadChat(false);
+  }
+  else if (act === "chat-send") {
+    const box = document.getElementById("chat-text");
+    const text = box ? box.value.trim() : "";
+    if (!text) return toast("Nachricht ist leer", true);
+    if (t.getAttribute("aria-disabled") === "true") return toast("Zentrale nicht erreichbar – Text bleibt stehen.", true);
+    const urgent = !!(document.getElementById("chat-dringend") || {}).checked;
+    const conv = state.chatConv;                                                  // vor dem Warten festhalten
+    if (state.chatSending) return;                                                // kein Doppelklick
+    state.chatSending = true;
+    try {
+      await TM.call("chat_senden", { gespraech: conv, text, dringend: urgent });
+      (state.chatDrafts = state.chatDrafts || {})[conv] = "";
+      (state.chatUrgent = state.chatUrgent || {})[conv] = false;                // nächste Nachricht nicht ungewollt dringend
+      if (state.chatConv === conv) {
+        const now = document.getElementById("chat-text"); if (now) now.value = "";
+        const cb = document.getElementById("chat-dringend"); if (cb) cb.checked = false;
+      }
+      render(true);
+    } catch (e) { toast(e.message, true); }                                       // Text bleibt stehen
+    finally { state.chatSending = false; }
+    return;
+  }
+  else if (act === "fm-test") {
+    if (t.getAttribute("aria-disabled") === "true") return toast("Erst „Fertigmeldung senden“ einschalten und eine Adresse eintragen.", true);
+    try { const r = await TM.call("fertigmeldung_testen", {}); toast(r.meldung); } catch (e) { toast(e.message, true); }
+    return;
   }
   else if (act === "catchup") {
     try { const r = await TM.call("nachtragen", {}); toast(r.text, r.konflikte.length > 0); } catch (e) { toast(e.message, true); }
@@ -2069,6 +2328,7 @@ async function onClick(ev, t) {
   }
   else if (act === "fetch") { openFlow(); }
   else if (act === "settings") { openSettings(); }
+  else if (act === "open-zentrale") { openSettings("system.zentrale"); }
   else if (act === "voc-save") {
     try { state.settings.voc = await TM.call("vocaster_routing_sichern", {}); Live.say(state.settings.voc.meldung || "Routing gesichert"); }
     catch (e) { toast(e.message, true); }
@@ -2084,6 +2344,16 @@ async function onClick(ev, t) {
   }
   else if (act === "deliver") { openDeliver(); }
   else if (act === "del-start") { startDeliver(); }
+  else if (act === "del-paste") {
+    try {
+      const pasted = (await TM.call("videoid_einfuegen", {})).videoid;
+      const before = state.flow.videoid.trim();
+      if (!pasted) { toast("Zwischenablage ist leer – VideoID unverändert"); return; }
+      state.flow.videoid = pasted;
+      render();
+      toast(before && before !== pasted ? `VideoID ersetzt: ${pasted} (vorher ${before})` : `VideoID eingefügt: ${pasted}`);
+    } catch (e) { toast(e.message, true); }
+  }
   else if (act === "flow-cancel" || act === "flow-back") { closeFlow(); }
   else if (act === "flow-start") { startFetch(); }
   else if (act === "reopen-new") { openFlow(true); }
@@ -2114,7 +2384,6 @@ document.addEventListener("change", async (ev) => {
   if (t.dataset.hvdelDesktop) { state.flow.desktop = t.checked; return render(); }
   if (t.dataset.hvdelHavarie) { state.flow.havarie = t.checked; return render(); }
   if (t.dataset.maintpl) { state.tplPick = t.value; return; }
-  if (t.dataset.room !== undefined && t.tagName === "SELECT") { state.settings.rooms.rows[Number(t.dataset.room)][t.dataset.rkey] = t.value; return; }
   if (t.dataset.login === "user") { state.dialog.sel = t.value; state.dialog.std = state.users.standard === t.value; return render(); }
   if (t.dataset.login === "std") { state.dialog.std = t.checked; return render(); }
   if (t.dataset.profTpl) {
@@ -2128,8 +2397,6 @@ document.addEventListener("change", async (ev) => {
     await profileCall("spurprofil_setzen", { spur: t.dataset.profTrack, spalte: t.dataset.profCell, wert: v });
     return Live.say(`${t.getAttribute("aria-label")}: ${t.type === "checkbox" ? (v ? "an" : "aus") : v}`);
   }
-  if (t.dataset.trPick) { state.settings.transfer.import.sel[t.dataset.trPick] = t.checked; return render(); }
-  if (t.dataset.trAll) { const im = state.settings.transfer.import; im.choices.forEach((c) => { im.sel[c.id] = t.checked; }); return render(); }
   if (t.dataset.profImp) { state.settings.profImport.sel[t.dataset.profImp] = t.checked; return render(); }
   if (t.dataset.profSwitch) return profileCall("spurprofil_schalter", { schalter: t.dataset.profSwitch, wert: t.type === "checkbox" ? t.checked : t.value });
   if (t.dataset.mvRow !== undefined) {
@@ -2145,10 +2412,7 @@ document.addEventListener("change", async (ev) => {
     } catch (e) { t.checked = !t.checked; toast(e.message, true); }
     return render();
   }
-  if (t.dataset.wtRoom) {
-    try { state.settings.wt = await TM.call("webtrigger_adressen", { raum: t.value }); } catch (e) { toast(e.message, true); }
-    return render();
-  }
+
   if (t.dataset.presetName) {
     try { state.settings.presets = (await TM.call("preset_umbenennen", { nr: Number(t.dataset.presetName), name: t.value })).presets; Live.say("Preset umbenannt"); }
     catch (e) { toast(e.message, true); }
@@ -2183,9 +2447,22 @@ let searchTimer = null;
 document.addEventListener("input", (ev) => {
   if (ev.target.dataset && ev.target.dataset.login === "new") { state.dialog.newName = ev.target.value; return; }
   if (ev.target.dataset && ev.target.dataset.usrnew) { state.settings.usrNew = ev.target.value; return; }
-  if (ev.target.dataset && ev.target.dataset.room !== undefined && ev.target.tagName === "INPUT") { state.settings.rooms.rows[Number(ev.target.dataset.room)][ev.target.dataset.rkey] = ev.target.value; return; }
   if (ev.target.dataset && ev.target.dataset.usrname) { state.settings.usrEdit.name = ev.target.value; return; }
-  if (ev.target.dataset && ev.target.dataset.delTrack) { state.flow.sel[ev.target.dataset.delTrack] = ev.target.checked; return render(); }
+  if (ev.target.dataset && ev.target.dataset.delTrack) {
+    state.flow.sel[ev.target.dataset.delTrack] = ev.target.checked;
+    render();
+    const why = deliverBlocked();
+    if (why) Live.say(why);                // neu gezeichnete Live-Region liest VoiceOver nicht vor
+    return;
+  }
+  if (ev.target.id === "del-videoid") { state.flow.videoid = ev.target.value; return syncDeliverStart(); }
+  if (ev.target.dataset && ev.target.dataset.delNewok) {
+    state.flow.newOk = ev.target.checked;
+    render();
+    const why = deliverBlocked();
+    if (why) Live.say(why);
+    return;
+  }
   if (ev.target.id === "hv-path") { state.flow.path = ev.target.value; return; }
   if (ev.target.id === "hv-title") { state.flow.title = ev.target.value; return; }
   if (ev.target.id === "hv-id") { state.flow.pid = ev.target.value; return; }
@@ -2241,6 +2518,11 @@ document.addEventListener("keydown", (ev) => {
       else if (!ev.shiftKey && i === items.length - 1) { ev.preventDefault(); items[0].focus(); }
     }
   }
+  if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "r" && !ev.shiftKey) {
+    ev.preventDefault();                          // nie das Fenster neu laden – Liste neu einlesen
+    if (!dlg && !state.flow && !state.settings) refreshList();
+    return;
+  }
   if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "f" && !state.flow) {
     ev.preventDefault();
     const q = document.getElementById("q"); if (q) q.focus();
@@ -2252,6 +2534,7 @@ document.addEventListener("keydown", (ev) => {
     const i = rows.indexOf(a) + (ev.key === "ArrowDown" ? 1 : -1);
     if (rows[i]) select(rows[i].dataset.pick, true);
   }
+  if (a && a.id === "del-videoid" && ev.key === "Enter") { ev.preventDefault(); startDeliver(); }
   if (a && a.dataset && a.dataset.pick && ev.key === "Enter") {
     ev.preventDefault();
     const b = document.querySelector("[data-act='fetch']:not([disabled])") || document.querySelector(".detail-foot button:not([disabled])");
@@ -2347,14 +2630,36 @@ async function start() {
   if (state.users && state.users.needs_login && !auto0) await openLogin();   // beim Start fragen (Jens 04.10.2026)
   const auto = location.hash.startsWith("#auto=") ? decodeURIComponent(location.hash.slice(6)) : null;
   if (auto) autopilot(auto); else TM.call("ready").catch(() => {});
-  let ticking = false;                     // Takt nicht stapeln: hängt Helmut, läuft die vorige Abfrage noch (Review A13)
-  setInterval(async () => {
-    if (ticking) return;
-    ticking = true;
-    const calls = [refreshStatus(true)];
-    // Liste und Räume nur, wenn sie zu sehen sind – nicht hinter den Einstellungen (Review B32)
-    if (!state.dialog && !state.flow && !state.settings) { calls.push(loadList(true)); if (state.view !== "rooms") calls.push(loadRooms()); }
-    try { await Promise.allSettled(calls); } finally { ticking = false; }
-  }, 15000);
+  scheduleTick();
+}
+
+// Takt (Standard 15 s; Betriebsart Übergabeordner: Einstellung). Nicht stapeln: hängt Helmut oder der Speicher, läuft
+// die vorige Abfrage noch (Review A13). „Aktualisieren“ (⌘R) liest sofort neu ein und setzt den Takt zurück.
+let tickTimer = null;
+let ticking = false;
+function scheduleTick() {
+  clearTimeout(tickTimer);
+  const s = Math.max(5, Number(state.status && state.status.liste_intervall_s) || 15);
+  tickTimer = setTimeout(tick, s * 1000);
+}
+async function tick() {
+  if (ticking) return scheduleTick();
+  ticking = true;
+  const calls = [refreshStatus(true)];
+  // Liste und Räume nur, wenn sie zu sehen sind – nicht hinter den Einstellungen (Review B32)
+  if (!state.dialog && !state.flow && !state.settings) { calls.push(loadList(true)); if (state.view !== "rooms") calls.push(loadRooms()); }
+  try { await Promise.allSettled(calls); } finally { ticking = false; scheduleTick(); }
+}
+async function refreshList() {
+  if (state.listBusy) return;                     // Doppelklicks nicht stapeln
+  state.listBusy = true;
+  clearTimeout(tickTimer);
+  render(true);
+  state.listNow = true;                             // im Ordnerbetrieb: Freigabe sofort neu verbinden
+  try { await Promise.allSettled([loadList(false, true), loadRooms()]); }
+  finally {
+    state.listBusy = false; render(true); scheduleTick();
+    if (state.list) Live.say(`Liste aktualisiert – ${state.list.rows.length} Beiträge`);
+  }
 }
 start();

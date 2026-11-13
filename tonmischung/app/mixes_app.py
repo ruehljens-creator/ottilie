@@ -12,9 +12,12 @@ log = logging.getLogger("tonmischung.app")
 
 
 def mix_log(ctx: AppContext) -> ML.MixLog:
-    """Verzeichnis der Mischungen dieses Macs (im Mock-Betrieb eine eigene Datei)."""
+    """Verzeichnis der Mischungen dieses Macs – im gemeinsamen Datenordner (im Mock-Betrieb eine eigene Datei)."""
     if "mischungen" not in ctx.extra:
-        ctx.extra["mischungen"] = ML.MixLog(ML.default_path(mock=ctx.mock is not None))
+        from tonmischung.core.machine_data import MIXES
+        folder = ctx.extra.get("datenordner")
+        path = folder / MIXES if folder is not None and ctx.mock is None else ML.default_path(mock=ctx.mock is not None)
+        ctx.extra["mischungen"] = ML.MixLog(path)
     return ctx.extra["mischungen"]
 
 

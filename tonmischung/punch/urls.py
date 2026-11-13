@@ -14,22 +14,17 @@ from urllib.parse import urlencode
 from tonmischung.punch.triggers import LABELS, PATH_CMD, VOC_CMD
 
 P = "system.streamdeck_webtrigger."
-ROOMS = "system.raeume_nutzer.raeume"
-
-
-def rooms(settings: Any) -> list[dict]:
-    return [dict(r) for r in settings.get(ROOMS) or [] if r.get("name")]
 
 
 def addresses(settings: Any, room: str, token: str = "", this_host: str | None = None) -> dict[str, Any]:
-    """Adressen für den Platz `room`. Host = Rechnername des Raums (bzw. dieses Macs), oder 127.0.0.1."""
-    entry = next((r for r in rooms(settings) if r["name"] == room), {})
+    """Adressen dieses Macs (Raum `room`). Host = Rechnername dieses Macs, oder 127.0.0.1. Der ID-Code gehört zum Mac
+    (Einstellung, seit 13.11.2026 nicht mehr an einer Raumliste)."""
     if settings.get(P + "adresse_in_url") == "127.0.0.1":
         host = "127.0.0.1"
     else:
-        host = (entry.get("rechnername") or this_host or socket.gethostname().split(".")[0]).strip()
+        host = (this_host or socket.gethostname().split(".")[0]).strip()
     port = int(settings.get(P + "port") or 8899)
-    id_code = (entry.get("id_code") or "").strip()
+    id_code = str(settings.get(P + "id_code") or "").strip()
     query = {k: v for k, v in (("id", id_code), ("token", token)) if v}
     suffix = ("?" + urlencode(query)) if query else ""
     base = f"http://{host}:{port}"
@@ -41,7 +36,7 @@ def addresses(settings: Any, room: str, token: str = "", this_host: str | None =
     note = ("mit ID-Code" if id_code else
             ("ohne Code nur von diesem Mac auslösbar" if settings.get(P + "nur_mit_id_code") else "ohne ID-Code"))
     return {"room": room, "host": host, "port": port, "id_code": id_code, "rows": rows,
-            "count_text": f"{len(rows)} Aufrufe · {note}", "rooms": [r["name"] for r in rooms(settings)]}
+            "count_text": f"{len(rows)} Aufrufe · {note}"}
 
 
 def new_id_code(room: str, rng: random.Random | None = None) -> str:
@@ -51,12 +46,6 @@ def new_id_code(room: str, rng: random.Random | None = None) -> str:
     return f"{head}-{rng.getrandbits(16):04X}"
 
 
-def set_id_code(settings: Any, room: str, code: str) -> None:
-    """ID-Code am Raum setzen ("" = entfernen); lokal gespeichert, bis die Raumliste zentral kommt."""
-    entries = rooms(settings)
-    hit = [r for r in entries if r["name"] == room]
-    if not hit:
-        raise ValueError(f"Raum „{room}“ steht nicht in der Raumliste (System → Räume & Nutzer)")
-    for r in hit:
-        r["id_code"] = code
-    settings.set_local(ROOMS, entries)
+def set_id_code(settings: Any, code: str) -> None:
+    """ID-Code dieses Macs setzen ("" = entfernen)."""
+    settings.set_local(P + "id_code", code)

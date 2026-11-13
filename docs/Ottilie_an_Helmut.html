@@ -189,6 +189,7 @@ svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
     <li><a href="#aufrufe">Aufrufe</a></li>
     <li><a href="#funktionen">Funktionen</a></li>
     <li><a href="#set">Set „Mischung“</a></li>
+    <li><a href="#metadaten">Metadaten-Datei</a></li>
     <li><a href="#zustaende">Zustände</a></li>
     <li><a href="#ausfall">Ausfall</a></li>
     <li><a href="#einstellungen">Einstellungen</a></li>
@@ -203,9 +204,9 @@ svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
     <div class="box">
       <h3 style="margin-top:0">Einrichten</h3>
       <ul class="check">
-        <li><span><strong>Service-Konto</strong> für Ottilie, mit Benutzername und Kennwort oder OAuth-Schlüssel und -Geheimnis. Es liegt auf jedem Mac im Schlüsselbund unter <code>ottilie-helmut</code>, nie in Dateien.</span></li>
-        <li><span><strong>Rechte des Kontos:</strong> FX-Projekte suchen und lesen, Metadaten schreiben, Projektstatus setzen, Projekte duplizieren, Assets lesen und anlegen, Benachrichtigungen an Nutzer senden.</span></li>
-        <li><span><strong>Metadaten-Set „Mischung“</strong> am FX-Projekt mit den <a href="#set">17 Feldern</a> unten, alle als Text.</span></li>
+        <li><span><strong>Service-Konto</strong> für Ottilie, mit Benutzername und Kennwort, OAuth-Schlüssel und -Geheimnis oder einem Bearer-Token (API-Token). Es liegt auf jedem Mac im Schlüsselbund unter <code>ottilie-helmut</code>, nie in Dateien.</span></li>
+        <li><span><strong>Rechte des Kontos:</strong> FX-Projekte suchen und lesen, Metadaten schreiben, Projektstatus setzen, Projekte duplizieren, Assets lesen und anlegen, Benachrichtigungen an Nutzer senden. Für Benachrichtigungen an andere Nutzer braucht das Konto laut OpenAPI die Admin-Rolle (<code>/users/notification/{userName}</code>).</span></li>
+        <li><span><strong>Metadaten-Set „Mischung“</strong> am FX-Projekt mit den <a href="#set">18 Feldern</a> unten, alle als Text.</span></li>
         <li><span><strong>Projektstatus</strong> <code>LOCKED</code> und <code>UNLOCKED</code> setzbar.</span></li>
       </ul>
     </div>
@@ -305,13 +306,13 @@ svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
 <text class="ep" x="330" y="766" text-anchor="end">PTSL</text>
 <text class="nt" x="330" y="779" text-anchor="end">konsolidieren, R 128, WAVs</text>
 <line class="ar ar-file" x1="344" y1="824" x2="859" y2="824" marker-end="url(#ah-file)"/>
-<text class="nt" x="350" y="818" text-anchor="start">WAVs nach Mischung/{projektId}/&lt;Zeit&gt;/</text>
+<text class="nt" x="350" y="818" text-anchor="start">WAVs + Metadaten-JSON nach Mischung/{projektId}/&lt;Zeit&gt;/</text>
 <line class="ar ar-call" x1="344" y1="864" x2="654" y2="864" marker-end="url(#ah-call)"/>
 <text class="ep" x="350" y="846" text-anchor="start">POST /v1/co/assets</text>
-<text class="nt" x="350" y="859" text-anchor="start">je WAV ein Asset (AUDIO, art = tonspur)</text>
+<text class="nt" x="350" y="859" text-anchor="start">je WAV ein Asset (AUDIO), zuletzt das JSON (DATA)</text>
 <line class="ar ar-call" x1="344" y1="904" x2="654" y2="904" marker-end="url(#ah-call)"/>
 <text class="ep" x="350" y="886" text-anchor="start">PUT /v1/fx/projects/metadata/{id}</text>
-<text class="nt" x="350" y="899" text-anchor="start">zustand = ausgeliefert, fortschritt = 100</text>
+<text class="nt" x="350" y="899" text-anchor="start">zustand = ausgeliefert, fortschritt = 100, videoid</text>
 <line class="ar ar-call" x1="344" y1="944" x2="654" y2="944" marker-end="url(#ah-call)"/>
 <text class="ep" x="350" y="926" text-anchor="start">PUT /v1/fx/projects/status/{id}</text>
 <text class="nt" x="350" y="939" text-anchor="start">UNLOCKED – Beitrag ist frei</text>
@@ -341,7 +342,7 @@ svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
 
 <section class="part" id="aufrufe" aria-labelledby="h-auf">
   <div class="part-head"><span class="who">REST, Helmut4-OpenAPI</span><h2 id="h-auf">Die Aufrufe</h2></div>
-  <p>Ottilie nutzt zehn Endpunkte. Die Adresse ist der Server ohne Pfad; die Dienste liegen unter <code>/v1/members</code>, <code>/v1/fx</code> und <code>/v1/co</code>. Jede Anfrage trägt <code>Authorization: Bearer &lt;Token&gt;</code>.</p>
+  <p>Ottilie nutzt elf Endpunkte. Die Adresse ist der Server ohne Pfad; die Dienste liegen unter <code>/v1/members</code>, <code>/v1/fx</code> und <code>/v1/co</code>. Jede Anfrage trägt <code>Authorization: Bearer &lt;Token&gt;</code>.</p>
   <div class="tablewrap">
   <table>
     <caption>Endpunkte, die Ottilie aufruft</caption>
@@ -353,6 +354,12 @@ svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
       <tr><td class="ep"><span class="m">POST</span><code>/v1/members/auth/oauth?responseWithToken=true</code></td>
         <td>Anmelden mit OAuth (Einstellung „oauth“).</td>
         <td>Formular: <code>client_id</code>, <code>client_secret</code>, <code>grant_type=authorization</code>, <code>scope=platform</code> → Token wie oben.</td></tr>
+      <tr><td class="ep"><span class="m">–</span><code>Authorization: Bearer &lt;Token&gt;</code></td>
+        <td>Bearer-Token des Kontos (Einstellung „token“), ohne Anmeldeaufruf.</td>
+        <td>Token als Kennwort im Schlüsselbund, roh, als <code>Bearer &lt;Token&gt;</code> oder <code>Bearer%20&lt;Token&gt;</code> (URL-kodiert). Lehnt Helmut es ab (401), liest Ottilie den Schlüsselbund neu und versucht ein dort neu eingetragenes Token einmal; ob das Token oder nur der Aufruf abgelehnt wird, zeigt <code>whoami</code>. Weiterleitungen nur bei GET, das Token nur an denselben Server.</td></tr>
+      <tr><td class="ep"><span class="m get">GET</span><code>/v1/members/auth/whoami</code></td>
+        <td>Nur mit Bearer-Token: Die Titelleiste prüft, ob Helmut erreichbar ist und das Token annimmt.</td>
+        <td>Kein Inhalt → <code>User</code>; 401, wenn Helmut das Token ablehnt.</td></tr>
       <tr><td class="ep"><span class="m">POST</span><code>/v1/fx/projects/search?limit=500&amp;page=0</code></td>
         <td>Liste „Zur Mischung“, Raumstatus, Prüfung „gehört die offene Session zu einem ausgelieferten Beitrag?“.</td>
         <td><code>{"type": "FX", "any": false, "filter": [], "sortParameter": {"key": "modifyDate", "direction": "DESC"}}</code> → Liste der Projekte.</td></tr>
@@ -369,8 +376,8 @@ svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
         <td>Sperren beim Übernehmen; entsperren beim Freigeben, nach dem Zurückliefern und am Duplikat.</td>
         <td><code>{"status": "LOCKED"}</code> bzw. <code>{"status": "UNLOCKED"}</code>.</td></tr>
       <tr><td class="ep"><span class="m">POST</span><code>/v1/co/assets?createBinStructure=true</code></td>
-        <td>Zurückgelieferte WAVs anmelden; am Duplikat die Übergabe-Dateien des Originals.</td>
-        <td><code>{"projectId", "filepath", "mimeType": "AUDIO", "customMetadata": [{"key": "art", "value": "tonspur"}]}</code>; Übergabe: <code>DATA</code> bzw. <code>VIDEO</code>, <code>art = uebergabe</code>.</td></tr>
+        <td>Zurückgelieferte WAVs und die Metadaten-Datei anmelden; am Duplikat die Übergabe-Dateien des Originals.</td>
+        <td><code>{"projectId", "filepath", "mimeType": "AUDIO", "customMetadata": [{"key": "art", "value": "tonspur"}]}</code>; Metadaten-Datei: <code>DATA</code>, <code>art = metadaten</code>; Übergabe: <code>DATA</code> bzw. <code>VIDEO</code>, <code>art = uebergabe</code>.</td></tr>
       <tr><td class="ep"><span class="m">POST</span><code>/v1/fx/projects/duplicate</code></td>
         <td>Duplikat (Zweitfassung, Kurzfassung, Web, Ersatz).</td>
         <td>Projekt des Originals mit neuem <code>name</code> → neues Projekt mit neuer <code>id</code>.</td></tr>
@@ -384,7 +391,7 @@ svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
   <dl class="cases">
     <dt>Zeitlimit</dt><dd><p>15 s je Anfrage; die Anzeige „Helmut verbunden“ prüft mit 3 s und höchstens alle 30 s neu.</p></dd>
     <dt>Wiederholen</dt><dd><p>Lesen, <code>PUT</code>, Suche und Anmeldung bis zu zweimal (nach 1 s und 2 s). Anlegende Aufrufe (Asset, Duplikat, Nachricht) nur, wenn die Verbindung gar nicht zustande kam – sonst entstünden Doppelte.</p></dd>
-    <dt>Token abgelaufen</dt><dd><p>Bei <code>401</code> meldet sich Ottilie einmal neu an und wiederholt die Anfrage.</p></dd>
+    <dt>Anmeldung abgelehnt (401)</dt><dd><p>Bei Kennwort und OAuth meldet sich Ottilie einmal neu an und wiederholt die Anfrage; beim Bearer-Token liest sie den Schlüsselbund neu (siehe oben).</p></dd>
     <dt>Serverfehler</dt><dd><p><code>500</code>/<code>501</code> gelten als Fehler mit Meldung, nicht als „Helmut nicht erreichbar“. Nur echte Ausfälle gehen in die <a href="#ausfall">Nachtrag-Warteschlange</a>.</p></dd>
   </dl>
 </section>
@@ -419,8 +426,8 @@ svg.flow .ah-file, svg.flow .ah-helmut { fill: var(--warn-ink); }
         <td>Während eines Auftrags Fortschritt in 10-%-Stufen und Tätigkeit <code>import</code>/<code>export</code>, nur bei Änderung; am Ende Tätigkeit leer. Die Raumansicht liest die Beiträge, die einen Raum belegen.</td>
         <td><span class="m get">GET</span>, <span class="m put">PUT</span> Metadaten, <span class="m">POST</span> Suche</td></tr>
       <tr><td><strong>Zurückliefern</strong><br><code>zurueckliefern</code></td>
-        <td>WAVs (24 bit / 48 kHz, R 128) in <code>Übergabeordner/&lt;Zeitstempel&gt;/</code> kopieren, je WAV ein Asset. Dann Set: <code>ausgeliefert</code>, Fortschritt 100, Tätigkeit leer; danach entsperren. Erneut zurückliefern geht, solange niemand anders übernommen hat.</td>
-        <td><span class="m get">GET</span>, <span class="m">POST</span> Asset je WAV, <span class="m put">PUT</span> Metadaten, <span class="m put">PUT</span> Status</td></tr>
+        <td>WAVs (24 bit / 48 kHz, R 128) in <code>Übergabeordner/&lt;Zeitstempel&gt;/</code> kopieren, je WAV ein Asset; danach die <a href="#metadaten">Metadaten-Datei</a> als Asset. Dann Set: <code>ausgeliefert</code>, Fortschritt 100, Tätigkeit leer, <code>videoid</code>; danach entsperren. Erneut zurückliefern geht, solange niemand anders übernommen hat.</td>
+        <td><span class="m get">GET</span>, <span class="m">POST</span> Asset je WAV und für das JSON, <span class="m put">PUT</span> Metadaten, <span class="m put">PUT</span> Status</td></tr>
       <tr><td><strong>Freigeben</strong><br><code>freigeben</code></td>
         <td>Set: <code>zurueckgegeben</code>, Grund, Zeit, Raum, Wahl fürs nächste Öffnen (letzter Stand oder neu importieren); entsperren; Nachricht an bisherigen Mischer und Cutter.</td>
         <td><span class="m get">GET</span>, <span class="m put">PUT</span> Metadaten, <span class="m put">PUT</span> Status, <span class="m">POST</span> Nachricht</td></tr>
@@ -459,7 +466,7 @@ python3 -m tonmischung app --mock</pre>
   <p>Helmut kennt am Projekt nur gesperrt oder entsperrt. Alles Weitere steht in diesem Set. Ottilie erkennt die Felder am Namen (ersatzweise an <code>customId</code>) und schreibt alle als Text (<code>STRING</code>). Fehlt ein Feld, legt Ottilie es beim Schreiben an. Ein leeres Set gilt als „bereit“.</p>
   <div class="tablewrap">
   <table>
-    <caption>17 Felder</caption>
+    <caption>18 Felder</caption>
     <thead><tr><th>Feld</th><th>Inhalt</th><th>Werte, Beispiel</th></tr></thead>
     <tbody>
       <tr><td><code>zustand</code></td><td>Zustand der Mischung</td><td><code>bereit</code>, <code>uebernommen</code>, <code>importiert</code>, <code>in_mischung</code>, <code>exportiert</code>, <code>ausgeliefert</code>, <code>zurueckgegeben</code></td></tr>
@@ -471,6 +478,7 @@ python3 -m tonmischung app --mock</pre>
       <tr><td><code>session_ablage</code></td><td>Wo die Session liegt</td><td><code>helmut_storage</code>, <code>lokal</code>, <code>lokal_spiegelung</code></td></tr>
       <tr><td><code>session_spiegel</code></td><td>Spiegelordner bei lokaler Ablage</td><td>Pfad oder leer</td></tr>
       <tr><td><code>template</code></td><td>Template, aus dem die Session entstand</td><td><code>test/helmut test neues startband</code> (Gruppe/Name)</td></tr>
+      <tr><td><code>videoid</code></td><td>VideoID, beim Zurückliefern angegeben</td><td><code>VID-2026-0925-0142</code> oder leer</td></tr>
       <tr><td><code>uebernommen_um</code></td><td>Zeit der Übernahme</td><td>ISO 8601, UTC</td></tr>
       <tr><td><code>rueckgabe_grund</code></td><td>Grund beim Freigeben</td><td>Workstation abgestürzt, Raumwechsel, Versehentlich übernommen</td></tr>
       <tr><td><code>rueckgabe_um</code></td><td>Zeit der Freigabe</td><td>ISO 8601, UTC</td></tr>
@@ -482,7 +490,28 @@ python3 -m tonmischung app --mock</pre>
     </tbody>
   </table>
   </div>
+  <p class="muted">Das Feld <code>videoid</code> legt Ottilie an. Wie Helmut die VideoID künftig selbst liefert, ist noch abzustimmen.</p>
   <p class="muted">Dazu liest Ottilie, wenn vorhanden, diese Projektfelder (nur Anzeige): <code>airDate</code>/<code>sendetermin</code>, <code>due</code>/<code>sendung_in</code>, <code>duration</code>/<code>laenge</code>, <code>cutter</code>/<code>editor</code>, <code>urgent</code> und das Metadatum <code>uebergeben_um</code> (sonst <code>createDate</code>).</p>
+</section>
+
+<section class="part" id="metadaten" aria-labelledby="h-meta">
+  <div class="part-head"><span class="who">Beim Zurückliefern, neben den WAVs</span><h2 id="h-meta">Metadaten-Datei</h2></div>
+  <p>Als letzte Datei legt Ottilie <code>{projektId}_metadaten.json</code> in den Übergabeordner. Ein Helmut-Ablauf kann sie als Zeichen nehmen, dass alle WAVs da sind.</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Feld</th><th>Inhalt</th></tr></thead>
+    <tbody>
+      <tr><td><code>format</code></td><td><code>ottilie-auslieferung/1</code></td></tr>
+      <tr><td><code>projekt</code></td><td><code>id</code>, <code>titel</code>, <code>sendung</code></td></tr>
+      <tr><td><code>videoid</code></td><td>VideoID oder leer</td></tr>
+      <tr><td><code>video</code></td><td><code>name</code> und <code>pfad</code> des Referenzvideos laut Helmut, sonst <code>null</code></td></tr>
+      <tr><td><code>audio</code></td><td>Die WAVs in Kanalreihenfolge: <code>position</code>, <code>spur</code>, <code>inhalt</code>, <code>kanaele</code>, <code>datei</code>, <code>pfad</code>. Spuren, die nicht in der Spurtabelle stehen, folgen ohne Kanal.</td></tr>
+      <tr><td><code>kanalbelegung</code></td><td>Acht Kanalpaare (1/2 … 15/16), je Zeile der Spurtabelle eins; leere oder fehlende Zeilen sind <code>Stille</code>, nichts rückt auf.</td></tr>
+      <tr><td><code>mischung</code></td><td>Mischer, Raum, Session, Programmbeginn und -ende, Lautheit (Ziel, True Peak, Spuren)</td></tr>
+      <tr><td><code>bmx</code></td><td>Nur, was im ARD-ZDF-HDF-Sendefile erlaubt ist (das Profil verbietet Descriptive Metadata): <code>clip</code> = „&lt;VideoID&gt; &lt;Titel&gt;“ (<code>--clip</code>, Name des Material Package) und <code>create_date</code> (<code>--create-date</code>, UTC, bmx-Form). Titel, Sendung und Inhalt je Kanal stehen in den übrigen Feldern.</td></tr>
+    </tbody>
+  </table>
+  </div>
 </section>
 
 <section class="part" id="zustaende" aria-labelledby="h-zus">

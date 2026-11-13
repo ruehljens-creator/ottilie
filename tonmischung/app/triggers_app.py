@@ -1,8 +1,8 @@
 """Webtrigger und Stream-Deck-Socket in der App (Plan PunchBuddy-Übernahme, Schritt 3).
 
 Einstellungen: `system.streamdeck_webtrigger` – Port, Erreichbarkeit (127.0.0.1 / Netzwerk),
-Socket-Pfad, Token (im Schlüsselbund), „nur mit ID-Code“; der ID-Code steht am Raum
-(`system.raeume_nutzer.raeume`). `/import` holt den im Fenster gewählten Beitrag.
+Socket-Pfad, Token (im Schlüsselbund), „nur mit ID-Code“ und der ID-Code dieses Macs. `/import` holt den im
+Fenster gewählten Beitrag.
 """
 from __future__ import annotations
 
@@ -23,13 +23,6 @@ P = "system.streamdeck_webtrigger."
 TOKEN_ACCOUNT = "webtrigger"
 
 
-def room_id_code(settings: Any, room: str) -> str:
-    for r in settings.get("system.raeume_nutzer.raeume") or []:
-        if r.get("name") == room:
-            return (r.get("id_code") or "").strip()
-    return ""
-
-
 def ensure_token(settings: Any, read: Callable[[str, str], str] = read_secret,
                  write: Callable[[str, str, str], None] = write_secret) -> str:
     """Token aus dem Schlüsselbund. Im Netzwerk-Modus ohne Token wird eins erzeugt und gespeichert –
@@ -48,7 +41,7 @@ def ensure_token(settings: Any, read: Callable[[str, str], str] = read_secret,
 def trigger_config(settings: Any, room: str, token: str) -> TriggerConfig:
     return TriggerConfig(port=int(settings.get(P + "port") or 8899),
                          bind="0.0.0.0" if settings.get(P + "bind_adresse") == "netzwerk" else "127.0.0.1",
-                         token=token, id_code=room_id_code(settings, room),
+                         token=token, id_code=str(settings.get(P + "id_code") or "").strip(),
                          require_id=bool(settings.get(P + "nur_mit_id_code")))
 
 
@@ -124,6 +117,11 @@ def copy_to_clipboard(text: str) -> None:
     pb.setString_forType_(text, NSPasteboardTypeString)
 
 
+def read_clipboard() -> str:
+    from AppKit import NSPasteboard, NSPasteboardTypeString
+    return NSPasteboard.generalPasteboard().stringForType_(NSPasteboardTypeString) or ""
+
+
 def register(bridge: Any, ctx: Any, triggers: Triggers,
              copy: Callable[[str], None] = copy_to_clipboard) -> None:
     """Adressen zum Kopieren, ID-Code je Platz und Zwischenablage für das Einstellungsfenster."""
@@ -131,15 +129,17 @@ def register(bridge: Any, ctx: Any, triggers: Triggers,
     from tonmischung.punch import urls
 
     def view(args: dict) -> dict:
-        return urls.addresses(ctx.settings, args.get("raum") or ctx.room, token=triggers.token)
+        return urls.addresses(ctx.settings, ctx.room, token=triggers.token)
 
     def code(args: dict, value: Callable[[str], str]) -> dict:
-        room = args.get("raum") or ctx.room
+        from tonmischung.config.settings import SettingLockedError
         try:
-            urls.set_id_code(ctx.settings, room, value(room))
-        except ValueError as e:
+            urls.set_id_code(ctx.settings, value(ctx.room))
+        except SettingLockedError:
+            raise CommandError("Der ID-Code dieses Macs kommt aus der Geräteverwaltung – dort ändern") from None
+        except (ValueError, KeyError) as e:
             raise CommandError(str(e)) from e
-        return view({"raum": room})
+        return view({})
 
     def kopieren(args: dict) -> dict:
         copy(str(args.get("text", "")))

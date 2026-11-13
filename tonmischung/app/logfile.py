@@ -15,9 +15,11 @@ from pathlib import Path
 FORMAT = "%(asctime)s.%(msecs)03d %(levelname)-7s %(name)s: %(message)s"
 DATEFMT = "%Y-%m-%d %H:%M:%S"
 HIDDEN = "••••"
-# Webtrigger-Schlüssel in Adressen (`token=…`, auch JSON-kodiert), Helmut-Token im Kopf (`Bearer …`)
+# Webtrigger-Schlüssel in Adressen (`token=…`, auch JSON-kodiert), Helmut-Token im Kopf (`Bearer …`), Kennwort und
+# OAuth-Geheimnis der Helmut-Anmeldung
 _SECRETS = (re.compile(r"(token=)[^&\s\"'\\<>]+"), re.compile(r"(\"token\"\s*:\s*\")[^\"]+"),
-            re.compile(r"(Bearer\s+)[A-Za-z0-9._~+/=-]+"))
+            re.compile(r"(?i)(Bearer(?:\s+|%20))[A-Za-z0-9._~+/=%\\-]+"),
+            re.compile(r"(?i)(\"password\"\s*:\s*\")[^\"]+"), re.compile(r"(?i)(client_secret=)[^&\s\"']+"))
 
 
 def redact(text: str) -> str:

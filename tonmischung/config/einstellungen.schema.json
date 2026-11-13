@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:ottilie:einstellungen-schema",
   "title": "Ottilie – Einstellungen",
-  "description": "Gruppierung wie in der Funktionsbeschreibung (Persönlich, Import, Export und Auslieferung, System) und im Prototyp. Jedes Feld trägt 'x-quelle'. Ein Feld ohne eigenes 'x-quelle' erbt den Wert der nächsthöheren Gruppe. Werte: 'mdm' = festes Konfigurationsprofil der Geräteverwaltung je Mac (verwaltete Voreinstellungen, in der App nur lesbar und gesperrt angezeigt); 'helmut' = veränderliche gemeinsame Daten, zentral für alle Macs (Helmut, später wahlweise optionale Datenbank), Änderung nur mit Admin-Recht; 'helmut-nutzer' = persönliche Daten im Helmut-Nutzerprofil (später wahlweise Datenbank), Rückfall lokal; 'lokal' = nur dieser Mac. Rangfolge beim Lesen: mdm > helmut/helmut-nutzer > lokal > default (Hausstandard). 'x-punchbuddy' nennt den vorhandenen Schlüssel der Produktivversion punchbuddy-protools 2.0.2 (~/.punchbuddy/settings.json), 'x-punchbuddy-helmut' einen Schlüssel, den es nur im ungetesteten Arbeitsstand punchbuddy-helmut gibt (Grundlage für die spätere Zusammenführung). Felder mit 'x-ab' sind vorbereitet, wirken aber noch nicht; das Fenster blendet sie aus ('noch ohne Funktion' bzw. die Ausbaustufe, die sie bringt).",
+  "description": "Gruppierung wie in der Funktionsbeschreibung (Persönlich, Import, Export und Auslieferung, System) und im Prototyp. Jedes Feld trägt 'x-quelle'. Ein Feld ohne eigenes 'x-quelle' erbt den Wert der nächsthöheren Gruppe. Werte: 'mdm' = festes Konfigurationsprofil der Geräteverwaltung je Mac (verwaltete Voreinstellungen, in der App nur lesbar und gesperrt angezeigt); 'nutzer' = gilt für den angemeldeten Nutzer (Einstellungen je Mischer; die Bereiche des Macs ausgenommen); 'lokal' = nur dieser Mac. Vorgaben der Ottilie-Zentrale (Übergabeordner, Betriebsart) gehen den Einstellungen des Nutzers und des Macs vor. Rangfolge beim Lesen: mdm > Spurprofil > nutzer > zentral > lokal > default (Hausstandard). 'x-punchbuddy' nennt den vorhandenen Schlüssel der Produktivversion punchbuddy-protools 2.0.2 (~/.punchbuddy/settings.json), 'x-punchbuddy-helmut' einen Schlüssel, den es nur im ungetesteten Arbeitsstand punchbuddy-helmut gibt (Grundlage für die spätere Zusammenführung). Felder mit 'x-ab' sind vorbereitet, wirken aber noch nicht; das Fenster blendet sie aus ('noch ohne Funktion' bzw. die Ausbaustufe, die sie bringt).",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -14,7 +14,7 @@
     "persoenlich": {
       "title": "Persönlich",
       "type": "object",
-      "x-quelle": "helmut-nutzer",
+      "x-quelle": "nutzer",
       "properties": {
         "farbschema": {
           "title": "Farbschema",
@@ -359,7 +359,7 @@
     "import": {
       "title": "Import",
       "type": "object",
-      "x-quelle": "helmut",
+      "x-quelle": "nutzer",
       "description": "Die Bereiche Zuordnungsregeln bis Import & Vorschau gelten wahlweise für alle Templates oder je Template ('profile_je_template').",
       "properties": {
         "zuordnungsregeln": {
@@ -932,7 +932,7 @@
     "export": {
       "title": "Export und Auslieferung",
       "type": "object",
-      "x-quelle": "helmut",
+      "x-quelle": "nutzer",
       "properties": {
         "havarie_zielordner": {
           "title": "Havarie-Zielordner",
@@ -1657,19 +1657,20 @@
               "x-ab": "noch ohne Funktion"
             },
             "videoid_abfragen": {
+              "title": "VideoID vor dem Zurückliefern abfragen",
               "type": "boolean",
-              "default": true,
-              "x-ab": "noch ohne Funktion"
+              "default": true
             },
             "videoid_zwischenablage": {
+              "title": "Aus der Zwischenablage einfügen anbieten",
               "type": "boolean",
-              "default": true,
-              "x-ab": "noch ohne Funktion"
+              "default": true
             },
             "videoid_pflicht": {
+              "title": "VideoID ist Pflicht",
               "type": "boolean",
               "default": false,
-              "x-ab": "noch ohne Funktion"
+              "x-hinweis": "Ohne Angabe wird nicht zurückgeliefert."
             }
           }
         },
@@ -1773,34 +1774,19 @@
           "title": "Räume & Nutzer",
           "type": "object",
           "properties": {
-            "raeume": {
-              "x-eigene-ansicht": true,
-              "type": "array",
-              "x-quelle": "helmut",
-              "minItems": 1,
-              "items": {
-                "type": "object",
-                "required": [
-                  "id",
-                  "name",
-                  "rechnername"
-                ],
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "rechnername": {
-                    "type": "string"
-                  },
-                  "id_code": {
-                    "type": "string",
-                    "description": "optionaler Webtrigger-ID-Code des Platzes; kein Zugriffsschutz"
-                  }
-                }
-              }
+            "raumname": {
+              "title": "Raumname dieses Macs",
+              "description": "Nur ohne Zentrale. Ist der Mac mit der Zentrale gekoppelt, gilt der Raum, dem die Administration ihn zugeordnet hat. Leer: der Rechnername.",
+              "type": "string",
+              "default": "",
+              "x-quelle": "mdm"
+            },
+            "datenordner": {
+              "title": "Gemeinsamer Datenordner dieses Macs",
+              "description": "Nachtrag, Mischungsverzeichnis und Havarie-Pakete gelten für alle Benutzer des Macs. Leer: /Users/Shared/Ottilie. Nicht über die Zentrale vorgebbar.",
+              "type": "string",
+              "default": "",
+              "x-quelle": "mdm"
             },
             "ablage": {
               "title": "Ablage der Nutzer",
@@ -1832,21 +1818,9 @@
               "x-nutzerwahl": true,
               "x-quelle": "lokal"
             },
-            "raum_erkennung": {
-              "enum": [
-                "rechnername",
-                "fest"
-              ],
-              "default": "rechnername",
-              "x-quelle": "mdm"
-            },
-            "raum_fest": {
-              "type": "string",
-              "x-quelle": "mdm"
-            },
             "nutzer": {
               "type": "array",
-              "x-quelle": "helmut",
+              "x-quelle": "nutzer",
               "items": {
                 "type": "object",
                 "required": [
@@ -1876,35 +1850,6 @@
               ],
               "default": "mac_benutzer",
               "x-quelle": "mdm"
-            },
-            "raumstatus": {
-              "type": "object",
-              "x-quelle": "helmut",
-              "properties": {
-                "teilen": {
-                  "type": "boolean",
-                  "default": true
-                },
-                "quelle": {
-                  "enum": [
-                    "helmut_mit_rueckfall",
-                    "nur_helmut",
-                    "nur_direkt"
-                  ],
-                  "default": "helmut_mit_rueckfall"
-                },
-                "stufen_prozent": {
-                  "enum": [
-                    10,
-                    25
-                  ],
-                  "default": 10
-                },
-                "intervall_s": {
-                  "type": "integer",
-                  "default": 5
-                }
-              }
             }
           }
         },
@@ -1925,10 +1870,11 @@
                 "anmeldeverfahren": {
                   "enum": [
                     "passwort",
-                    "oauth"
+                    "oauth",
+                    "token"
                   ],
                   "default": "passwort",
-                  "description": "passwort: Benutzername und Kennwort; oauth: OAuth-Schlüssel und -Geheimnis des Kontos (im Schlüsselbund als Konto und Kennwort)"
+                  "description": "passwort: Benutzername und Kennwort; oauth: OAuth-Schlüssel und -Geheimnis des Kontos (im Schlüsselbund als Konto und Kennwort); token: Bearer-Token (API-Token) des Kontos als Kennwort im Schlüsselbund, ohne Anmeldeaufruf"
                 },
                 "anmeldung": {
                   "enum": [
@@ -2092,6 +2038,296 @@
             }
           }
         },
+        "uebergabeordner": {
+          "title": "Übergabeordner",
+          "type": "object",
+          "x-quelle": "mdm",
+          "description": "Betriebsart und Übergabeordner. In der Betriebsart „Übergabeordner“ kommen die Filme aus Ordnern statt über die Helmut-API; die Mischung geht nach „<Filmordner>/Audio Export“, danach eine Fertigmeldung.",
+          "properties": {
+            "betriebsart": {
+              "title": "Betriebsart",
+              "enum": [
+                "helmut_api",
+                "uebergabeordner"
+              ],
+              "default": "helmut_api",
+              "x-labels": [
+                "Helmut-API",
+                "Übergabeordner"
+              ],
+              "description": "Gibt die Zentrale vor (Administration → Übergabeordner; ohne Eintrag Helmut-API) – dann hier gesperrt. Gewechselt wird nur, wenn kein Auftrag läuft, kein Film übernommen ist und der Nachtrag leer ist. Die aktive Betriebsart steht in der Titelleiste."
+            },
+            "name": {
+              "title": "Name des Übergabeordners",
+              "description": "Herkunft in der Liste, wenn es mehrere Übergabeordner gibt. Leer: „Übergabeordner“.",
+              "type": "string",
+              "default": ""
+            },
+            "wurzelordner": {
+              "title": "Übergabeordner",
+              "type": "string",
+              "default": "",
+              "x-ordner": true,
+              "description": "Darin je Film ein Ordner mit AAF, MXF und der Übergabe-JSON."
+            },
+            "netzadresse": {
+              "title": "Netzadresse des Übergabeordners",
+              "type": "string",
+              "default": "",
+              "description": "smb://Server/Freigabe/Unterordner – Ottilie bindet die Freigabe beim Start und vor dem Einlesen selbst ein (wie der Finder, für den angemeldeten Benutzer) und nimmt den tatsächlichen Einhängepunkt als Übergabeordner. Leer: Übergabeordner wie eingestellt (Freigabe von Hand oder per Geräteverwaltung verbunden). Nur smb://."
+            },
+            "netz_anmeldung": {
+              "title": "Anmeldung an der Freigabe",
+              "enum": [
+                "gast",
+                "kerberos",
+                "schluesselbund"
+              ],
+              "default": "gast",
+              "x-labels": [
+                "Gast (ohne Kennwort)",
+                "Kerberos (Anmeldung am Firmennetz)",
+                "Benutzer und Kennwort aus dem Schlüsselbund"
+              ],
+              "description": "Kennwörter nie in Einstellungen, Profil oder Zentrale – nur im Schlüsselbund des Benutzers."
+            },
+            "netz_schluesselbund_eintrag": {
+              "title": "Schlüsselbund-Eintrag für die Freigabe",
+              "type": "string",
+              "default": "ottilie-uebergabeordner",
+              "description": "Name des Eintrags (Konto = Benutzername an der Freigabe) bei Anmeldung „Schlüsselbund“."
+            },
+            "netz_erlaubte_server": {
+              "title": "Erlaubte Übergabe-Server",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Nur diese Server (Name oder Adresse) bindet Ottilie ein – leer: jeder. Per Konfigurationsprofil vorgeben, damit eine fremde Netzadresse (z. B. von einer gekaperten Zentrale) nicht greift."
+            },
+            "weitere_ordner": {
+              "title": "Weitere Übergabeordner",
+              "description": "Jeder Mischraum sieht die Filme aller Übergabeordner in einer Liste, mit Herkunft; zurückgeliefert wird in den jeweiligen Filmordner. Je Ordner Name, Pfad auf dem Mac oder Netzadresse (smb://…) mit Anmeldung. Wird in der Zentrale festgelegt.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "title": "Name",
+                    "type": "string"
+                  },
+                  "wurzelordner": {
+                    "title": "Pfad auf dem Mac",
+                    "type": "string"
+                  },
+                  "netzadresse": {
+                    "title": "Netzadresse (smb://…)",
+                    "type": "string"
+                  },
+                  "netz_anmeldung": {
+                    "title": "Anmeldung",
+                    "enum": [
+                      "gast",
+                      "kerberos",
+                      "schluesselbund"
+                    ]
+                  }
+                }
+              }
+            },
+            "uebergabe_json": {
+              "title": "Name der Übergabe-Datei",
+              "type": "string",
+              "default": "uebergabe.json",
+              "description": "Helmut schreibt sie als letzte Datei in den Filmordner; erst dann erscheint der Film in der Liste."
+            },
+            "wartezeit_s": {
+              "title": "Wartezeit, bevor ein neuer Beitrag erscheint (s)",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120,
+              "default": 3
+            },
+            "abfrageintervall_s": {
+              "title": "Liste neu einlesen alle (s)",
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 600,
+              "default": 15
+            },
+            "ordner_ignorieren": {
+              "title": "Ordner ignorieren, die so beginnen",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "_",
+                "."
+              ]
+            },
+            "wird_uebertragen_zeigen": {
+              "title": "Ordner ohne Übergabe-JSON als „wird übertragen“ zeigen",
+              "type": "boolean",
+              "default": true,
+              "description": "Zeigt Ordner, die Helmut noch füllt, gesperrt in der Liste."
+            },
+            "sperrdatei": {
+              "title": "Name der Sperrdatei",
+              "type": "string",
+              "default": ".ottilie-sperre.json"
+            },
+            "sperre_verwaist_h": {
+              "title": "Sperre gilt als verwaist nach (h)",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 12,
+              "description": "Ohne Änderung so lange übernommen: Ottilie weist darauf hin, dass die Sperre verwaist sein kann."
+            },
+            "exportordner": {
+              "title": "Name des Exportordners",
+              "type": "string",
+              "default": "Audio Export"
+            },
+            "erneute_lieferung": {
+              "title": "Bei erneuter Lieferung",
+              "enum": [
+                "ersetzen",
+                "zeitstempel"
+              ],
+              "default": "ersetzen",
+              "x-labels": [
+                "Vorigen Stand nach „_alt/<Zeit>“ verschieben",
+                "Neuer Unterordner mit Zeitstempel"
+              ],
+              "description": "„_alt“ trägt die Zeit der vorigen Lieferung. Nichts wird gelöscht."
+            },
+            "fertigmeldung": {
+              "title": "Fertigmeldung an Helmut",
+              "type": "object",
+              "properties": {
+                "aktiv": {
+                  "title": "Fertigmeldung senden",
+                  "type": "boolean",
+                  "default": false
+                },
+                "url": {
+                  "title": "Adresse (URL)",
+                  "type": "string",
+                  "default": "",
+                  "description": "Mit Anmeldung nur https:// (außer localhost)."
+                },
+                "methode": {
+                  "title": "Methode",
+                  "enum": [
+                    "POST",
+                    "PUT"
+                  ],
+                  "default": "POST"
+                },
+                "zeitlimit_s": {
+                  "title": "Zeitlimit (s)",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 120,
+                  "default": 15
+                },
+                "wiederholungen": {
+                  "title": "Wiederholungen",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5,
+                  "default": 2
+                },
+                "anmeldung": {
+                  "title": "Anmeldung",
+                  "enum": [
+                    "keine",
+                    "bearer",
+                    "basic",
+                    "api_key"
+                  ],
+                  "default": "keine",
+                  "x-labels": [
+                    "Keine",
+                    "Bearer-Token",
+                    "Basic (Benutzer und Kennwort)",
+                    "API-Key im Header"
+                  ],
+                  "description": "Geheimnis nur im Schlüsselbund (Eintrag unten): Kennwort = Token, Kennwort bzw. API-Key; bei Basic das Konto als Benutzer."
+                },
+                "api_key_header": {
+                  "title": "Name des API-Key-Headers",
+                  "type": "string",
+                  "default": "X-API-Key"
+                },
+                "schluesselbund_eintrag": {
+                  "title": "Schlüsselbund-Eintrag",
+                  "type": "string",
+                  "default": "ottilie-fertigmeldung"
+                },
+                "body_vorlage": {
+                  "title": "Body-Vorlage (JSON)",
+                  "type": "object",
+                  "default": {
+                    "ereignis": "{ereignis}",
+                    "format": "ottilie-fertigmeldung/1",
+                    "meldung_id": "{meldung_id}",
+                    "zeit": "{zeit}",
+                    "beitrag": {
+                      "id": "{projekt_id}",
+                      "titel": "{titel}",
+                      "uebergabe_nr": "{uebergabe_nr}",
+                      "aktuelle_uebergabe_nr": "{aktuelle_uebergabe_nr}"
+                    },
+                    "herkunft": {
+                      "schnittraum": "{schnittraum}"
+                    },
+                    "mischung": {
+                      "mischer": "{mischer}",
+                      "raum": "{raum}"
+                    },
+                    "film_ordner": "{film_ordner}",
+                    "export_ordner": "{export_ordner}",
+                    "metadaten_json": "{metadaten_json_pfad}",
+                    "dateien": "{dateien}"
+                  },
+                  "description": "Platzhalter: {ereignis}, {meldung_id}, {zeit}, {projekt_id}, {titel}, {uebergabe_nr} (gemischte Fassung), {aktuelle_uebergabe_nr} (zuletzt übergebene), {schnittraum}, {mischer}, {raum}, {film_ordner}, {export_ordner}, {metadaten_json_pfad}, {dateien}. Pfade relativ zum Übergabeordner."
+                },
+                "erfolgs_statuscodes": {
+                  "title": "Erfolgreiche Statuscodes",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [
+                    "2xx"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "zentrale": {
+          "title": "Zentrale",
+          "type": "object",
+          "x-quelle": "mdm",
+          "description": "Ottilie-Zentrale: Raumstatus, Chat, Belegen und zentrale Einstellungen über einen Server. Angemeldet wird einmal je Mac (gilt für alle Benutzer); Raum, Betriebsart und Übergabeordner legt dann die Zentrale fest. Ohne Verbindung arbeitet Ottilie mit dem zuletzt bekannten Stand weiter.",
+          "properties": {
+            "adresse": {
+              "title": "Adresse der Zentrale",
+              "type": "string",
+              "default": "",
+              "description": "https://Server:Port (z. B. https://testserver.example.ts.net:8443). Am besten per Konfigurationsprofil vorgeben; nach dem Anmelden gilt sie aus der Kopplung für alle Benutzer."
+            }
+          }
+        },
         "streamdeck_webtrigger": {
           "title": "Stream Deck & Webtrigger",
           "type": "object",
@@ -2133,7 +2369,15 @@
               "description": "Webtrigger von anderen Rechnern lösen nur mit dem ID-Code dieses Platzes aus; ist keiner vergeben, sind sie gesperrt. Aufrufe von diesem Mac (Stream Deck) brauchen keinen Code.",
               "type": "boolean",
               "default": false,
-              "x-quelle": "helmut"
+              "x-quelle": "nutzer"
+            },
+            "id_code": {
+              "title": "ID-Code dieses Macs",
+              "description": "Webtrigger aus dem Netz lösen nur mit ?id=<Code> aus. Erzeugen und entfernen unter „Adressen zum Kopieren“. Leer: keiner. Kein Zugriffsschutz – dafür ist das Token da.",
+              "type": "string",
+              "default": "",
+              "x-quelle": "mdm",
+              "x-eigene-ansicht": true
             },
             "bind_adresse": {
               "title": "Webtrigger erreichbar",
@@ -2183,7 +2427,7 @@
         "verteilung": {
           "title": "Verteilung (nur lesen)",
           "type": "object",
-          "x-quelle": "helmut",
+          "x-quelle": "nutzer",
           "properties": {
             "mindestversion_app": {
               "type": "string",

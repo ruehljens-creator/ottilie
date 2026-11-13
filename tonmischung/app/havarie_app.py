@@ -24,6 +24,7 @@ from tonmischung.core import mix_log as ML
 from tonmischung.delivery import mux as M
 from tonmischung.delivery import tools as W
 from tonmischung.delivery import transfer as T
+from tonmischung.delivery.manifest import VideoIdError, clean_video_id
 from tonmischung.delivery.presets import DEFAULT_PRESETS
 from tonmischung.workflow import havarie_delivery as H
 
@@ -113,8 +114,14 @@ def _preset(pid: str) -> dict:
 
 
 def package_index(ctx: AppContext):
+    """Session → Paketordner, im gemeinsamen Datenordner (im Mock-Betrieb eine eigene Datei)."""
     from tonmischung.core.havarie import PackageIndex, index_path
-    return ctx.extra.setdefault("havarie_pakete", PackageIndex(index_path(mock=ctx.mock is not None)))
+    from tonmischung.core.machine_data import PACKAGES
+    if "havarie_pakete" not in ctx.extra:
+        folder = ctx.extra.get("datenordner")
+        path = folder / PACKAGES if folder is not None and ctx.mock is None else index_path(mock=ctx.mock is not None)
+        ctx.extra["havarie_pakete"] = PackageIndex(path)
+    return ctx.extra["havarie_pakete"]
 
 
 def info(ctx: AppContext, args: dict, volumes: Any = None) -> dict[str, Any]:
@@ -161,7 +168,8 @@ def info(ctx: AppContext, args: dict, volumes: Any = None) -> dict[str, Any]:
             "usb": [_with_auto(v) for v in (volumes or T.removable_volumes)()], "missing_tools": missing,
             "bmx": bool(tools.bmx), "havarie_ordner": str(ctx.settings.get("export.havarie_zielordner") or ""),
             "schreibtisch": os.path.join(os.path.expanduser("~"), "Desktop", T.HAVARIE_FOLDER),
-            "pruefung": bool(ctx.settings.get("export.pruefung.formatpruefung"))}
+            "pruefung": bool(ctx.settings.get("export.pruefung.formatpruefung")),
+            "videoid_required": bool(ctx.settings.get("export.notweg_bericht.videoid_pflicht"))}
 
 
 AUTO_USB_MIN_FREE = 1_000_000_000                 # kleinere Partitionen (z. B. RUFUS_BOOT, 1 MB) nicht vorwählen
@@ -229,8 +237,14 @@ def start(ctx: AppContext, runner: JobRunner, args: dict) -> dict:
     if s is None:
         raise CommandError("Keine Session offen – bitte die Havarie-Session in Pro Tools öffnen")
     session_path = s.path
+    try:                                                 # Jens 11.11.2026: VideoID in den Clipnamen
+        videoid = clean_video_id(args.get("videoid"))
+    except VideoIdError as e:
+        raise CommandError(str(e)) from None
+    if not videoid and ctx.settings.get("export.notweg_bericht.videoid_pflicht"):
+        raise CommandError("VideoID fehlt – ohne VideoID wird nicht ausgeliefert")
     req = H.Request(pkg.aaf, preset, targets, str(args.get("title") or pkg.title), show=str(args.get("sendung") or ""),
-                    project_id=pkg.project_id, picture=str(args.get("bild") or ""))
+                    project_id=pkg.project_id, picture=str(args.get("bild") or ""), videoid=videoid)
 
     def work(jc: JobContext) -> dict:
         r = H.deliver_havarie(req, ptsl=ctx.ptsl, get=ctx.settings.get, tools=tools, session_path=session_path,

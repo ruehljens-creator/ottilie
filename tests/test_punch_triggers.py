@@ -213,13 +213,12 @@ def test_token_nur_im_schluesselbund(tmp_path):
     assert token not in (tmp_path / "e.json").read_text()                   # nie in den Einstellungen
 
 
-def test_konfiguration_mit_id_code_des_raums(tmp_path):
+def test_konfiguration_mit_id_code_dieses_macs(tmp_path):
     from tonmischung.app.triggers_app import trigger_config
-    s = _settings(tmp_path, **{"system.raeume_nutzer.raeume": [
-        {"name": "Ton 3", "rechnername": "ton3-mac", "id_code": "T3-7F2A"}, {"name": "Ton 2", "rechnername": "ton2-mac"}]})
+    s = _settings(tmp_path, **{"system.streamdeck_webtrigger.id_code": " T3-7F2A "})
     cfg = trigger_config(s, "Ton 3", "tok")
     assert (cfg.port, cfg.bind, cfg.token, cfg.id_code, cfg.require_id) == (8899, "127.0.0.1", "tok", "T3-7F2A", False)
-    assert trigger_config(s, "Ton 2", "").id_code == ""
+    assert trigger_config(_settings(tmp_path / "x"), "Ton 2", "").id_code == ""
 
 
 def test_import_holt_den_gewaehlten_beitrag(tmp_path):

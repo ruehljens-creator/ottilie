@@ -47,8 +47,10 @@ Ein vorhandenes DMG gleichen Namens wird beiseitegelegt (`…-vorher-<Zeit>.dmg`
 3. **Start bei der Anmeldung:** `Ottilie launchagent > de.ottilie.app.plist`, nach
    `/Library/LaunchAgents/` verteilen. Startet die App bei der Anmeldung; nach einem Absturz startet launchd sie neu,
    bewusstes Beenden bleibt beendet.
-4. **Datenschutz-Freigaben (PPPC):** Automation „System Events“ (Dialog „Missing Files“ in Pro Tools), Bedienungshilfen
-   für PunchBuddys Tastenkürzel, lokales Netzwerk (Bonjour-Raumstatus).
+4. **Datenschutz-Freigaben:** Automation „System Events“ (Dialoge in Pro Tools), Bedienungshilfen für die
+   Tastenkürzel der Aufnahme, lokales Netzwerk (Zentrale, Übergabeordner, Webtrigger). Solange das Paket ad hoc
+   signiert ist, lassen sie sich nicht per PPPC-Profil vorgeben – am Mac bestätigen, nach jedem Update erneut.
+5. **Gemeinsamer Datenordner:** `install -d -o root -g staff -m 2775 /Users/Shared/Ottilie` (siehe `docs/MDM.md`).
 
 ## Offen
 

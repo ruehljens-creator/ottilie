@@ -113,8 +113,8 @@ def _cmd_helmut(args: argparse.Namespace) -> int:
                 wer = f" · {b.mix.mixer} ({b.mix.room})" if b.mix.mixer else ""
                 print(f"{b.id}  {b.title}  [{b.show}]  {b.mix.state}{wer}")
             return 0
-        mixer, room = factory.identity(s)
-        service = MixService(client, mixer, room)
+        mixer, room = factory.identity(s, central=True)
+        service = MixService(client, mixer, room, queue=_queue(client))   # Nachtrag-Reihenfolge wie in der App
         if args.aktion == "uebernehmen":
             b = service.take(args.beitrag)
             print(f"Übernommen: {b.title} · {mixer} ({room})")
@@ -220,7 +220,7 @@ def _cmd_fetch(args: argparse.Namespace) -> int:
               file=sys.stderr)
         return 1
     client = factory.helmut_client(s)
-    mixer, room = factory.identity(s)
+    mixer, room = factory.identity(s, central=True)
 
     def delivered(path: str) -> bool:
         return any(same_session(b.mix.session_path, path) and b.mix.state == DELIVERED
@@ -232,7 +232,8 @@ def _cmd_fetch(args: argparse.Namespace) -> int:
         try:
             result = _with_progress(
                 f"Holen: {args.beitrag}", FETCH_STEPS, lambda progress: fetch(
-                    args.beitrag, service=MixService(client, mixer, room, queue=_queue()), ptsl=factory.ptsl_client(s),
+                    args.beitrag, service=MixService(client, mixer, room, queue=_queue(client)),
+                    ptsl=factory.ptsl_client(s),
                     template_group=template[0], template_name=template[1],
                     session_parent=s.get("import.session_ablage.lokaler_ordner"),
                     confirmed=confirmed, is_delivered=delivered,
@@ -269,7 +270,7 @@ def _cmd_deliver(args: argparse.Namespace) -> int:
         return 1
     s = factory.load_settings()
     client = factory.helmut_client(s)
-    mixer, room = factory.identity(s)
+    mixer, room = factory.identity(s, central=True)
     export, loud = factory.export_tracks(s, args.spuren)
     target = args.ziel or s.get("export.verarbeitung_helmut.uebergabeordner")
     lautheit = "export.spuren_lautheit.lautheit."
@@ -278,12 +279,15 @@ def _cmd_deliver(args: argparse.Namespace) -> int:
         try:
             result = _with_progress(
                 f"Zurückliefern: {args.beitrag}", DELIVER_STEPS, lambda progress: deliver(
-                    args.beitrag, service=MixService(client, mixer, room, queue=_queue()), ptsl=factory.ptsl_client(s),
+                    args.beitrag, service=MixService(client, mixer, room, queue=_queue(client)),
+                    ptsl=factory.ptsl_client(s),
                     export_tracks=export, loudness_tracks=loud, handover_root=target,
                     target_lufs=float(s.get(lautheit + "ziel_lufs")),
                     max_truepeak=float(s.get(lautheit + "true_peak_max_dbtp")),
                     confirmed=confirmed, progress=progress, export_names=factory.export_names(s),
-                    program_start=factory.program_start(s)),
+                    program_start=factory.program_start(s), video_id=args.videoid,
+                    track_table=factory.track_table(s),
+                    video_id_required=bool(s.get("export.notweg_bericht.videoid_pflicht"))),
                 window=not args.kein_fenster)
             break
         except NeedsConfirmation as e:
@@ -293,7 +297,7 @@ def _cmd_deliver(args: argparse.Namespace) -> int:
                 return 1
             answer = input(f"{e}. Speichern, schließen und Session des Beitrags öffnen? [j/N] ")
             confirmed = answer.strip().lower() in ("j", "ja", "y")
-        except (FetchError, ConflictError, HelmutError, PtslError, OSError) as e:
+        except (FetchError, ConflictError, HelmutError, PtslError, OSError, ValueError) as e:   # ValueError: VideoID
             print(f"Zurückliefern nicht möglich: {e}", file=sys.stderr)
             return 1
     for w in result.warnings:
@@ -318,15 +322,20 @@ def _confirm_triage(yes: bool):
     return confirm
 
 
-def _queue():
-    """Nachtrag-Warteschlange dieses Macs (dieselbe Datei wie die App)."""
+def _queue(client=None):
+    """Nachtrag-Warteschlange dieses Macs (dieselbe Datei wie die App, im gemeinsamen Datenordner)."""
     from tonmischung.core.catchup import CatchUpQueue
-    return CatchUpQueue()
+    from tonmischung.core.machine_data import CATCH_UP
+    q = CatchUpQueue(factory.machine_dir(factory.load_settings())[0] / CATCH_UP)
+    if client is not None:
+        q.target = lambda: factory.queue_target(client)
+    return q
 
 
 def _cmd_catch_up(args: argparse.Namespace) -> int:
     from tonmischung.helmut.catchup import replay
-    q = _queue()
+    client = factory.mode_client(factory.load_settings())
+    q = _queue(client)
     if args.verwerfen:
         try:
             e = q.dismiss(args.verwerfen)
@@ -336,7 +345,7 @@ def _cmd_catch_up(args: argparse.Namespace) -> int:
         print(f"Verworfen: {e.describe()}")
         return 0
     if not args.nur_zeigen:
-        print(replay(q, factory.helmut_client(factory.load_settings())).text)
+        print(replay(q, client).text)
     for e in q.pending():
         print(f"offen     {e.id}  {e.describe()}  ({e.attempts} Versuche)")
     for e in q.conflicts():
@@ -475,6 +484,7 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Mischung an Helmut zurückliefern: konsolidieren, R128, nur WAVs an Helmut")
     z.add_argument("beitrag", help="Projekt-ID")
     z.add_argument("--spuren", help="Exportspuren kommagetrennt, sonst aus der Spurtabelle")
+    z.add_argument("--videoid", help="VideoID für Metadaten-Datei und Helmut, sonst die aus Helmut")
     z.add_argument("--ziel", help="Übergabeordner ({projektId} wird ersetzt), sonst aus den Einstellungen")
     z.add_argument("--ja", action="store_true",
                    help="andere offene, nicht ausgelieferte Session ohne Rückfrage speichern und schließen")

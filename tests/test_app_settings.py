@@ -128,3 +128,12 @@ def test_ausgeblendet_ist_was_noch_nicht_wirkt(tmp_path):
              for g in sv.section(s, schema, sec["id"])["groups"] for f in g["fields"]}
     assert not shown & set(hidden) and "export.pse.pruefen" not in shown
     assert "Prüfung" not in [sec["title"] for a in sv.areas(schema) for sec in a["sections"]]   # ganz ausgeblendet
+
+
+def test_zentral_vorgegeben_gesperrt(tmp_path):
+    s = _s(tmp_path)
+    s.update_central({"system.uebergabeordner.wartezeit_s": 7})
+    f = sv.field_view(s, SCHEMA, "system.uebergabeordner.wartezeit_s")
+    assert f["locked"] and "Zentrale" in f["layer_text"]
+    r = sv.set_value(s, SCHEMA, "system.uebergabeordner.wartezeit_s", 9)
+    assert r["errors"] and "Zentrale" in r["errors"][0] and s.get("system.uebergabeordner.wartezeit_s") == 7

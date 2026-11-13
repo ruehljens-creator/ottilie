@@ -88,6 +88,31 @@ def test_schluesselbund_eintrag_von_vorher(monkeypatch):
     assert keychain.read_secret("eigener-eintrag", "x") == "" and keychain.legacy_service("eigener") == ""
 
 
+def test_schluesselbund_hexausgabe(monkeypatch):
+    """`security -w` gibt ein Kennwort mit nicht druckbaren Zeichen hexkodiert aus (geprüft 10.11.2026); erst `-g`
+    zeigt, ob eine Hexfolge kodiert ist oder das Kennwort selbst."""
+    shown = {"kodiert": ("6162630a646566", 'password: 0x6162630A646566  "abc\\012def"'),
+             "klartext": ("deadbeef", 'password: "deadbeef"')}
+
+    def fake_run(cmd, **kw):
+        out, g = shown[cmd[cmd.index("-s") + 1]]
+        return types.SimpleNamespace(returncode=0, stdout="" if "-g" in cmd else out + "\n", stderr=g + "\n")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert keychain.read_secret("kodiert", "x") == "abc\ndef"
+    assert keychain.read_secret("klartext", "x") == "deadbeef"
+
+    def refused(cmd, **kw):                    # zweite Abfrage verweigert: der Wert aus -w gilt
+        return types.SimpleNamespace(returncode=51 if "-g" in cmd else 0, stdout="cafe\n", stderr="verweigert")
+    monkeypatch.setattr(subprocess, "run", refused)
+    assert keychain.read_secret("kodiert", "x") == "cafe"
+
+
+def test_protokoll_schwaerzt_bearer_in_jeder_form():
+    from tonmischung.app.logfile import redact
+    for line in ("Authorization: Bearer abc.def", "bearer abc.def", "BEARER abc.def", "Bearer%20abc.def"):
+        assert "abc" not in redact(line), line
+
+
 def test_kein_zugriff_ist_nicht_fehlt(monkeypatch):
     """Review B14: gesperrter Schlüsselbund oder verweigerter Zugriff galt als „fehlt“ – der Webtrigger erzeugte
     dann einen neuen Schlüssel, und alle Stream-Deck-Tasten waren ungültig."""
@@ -115,8 +140,8 @@ def test_kein_zugriff_ist_nicht_fehlt(monkeypatch):
 
 
 def test_name_und_kennungen():
-    from tonmischung.core import launchagent, peers
+    from tonmischung.core import launchagent
     from tonmischung.delivery import transfer
     assert (paths.APP_NAME, paths.BUNDLE_ID, launchagent.LABEL) == ("Ottilie", "de.ottilie.app", "de.ottilie.app")
-    assert peers.SERVICE_TYPE == "_ottilie._tcp." and transfer.HAVARIE_FOLDER == "Ottilie Havarie"
+    assert transfer.HAVARIE_FOLDER == "Ottilie Havarie"
     assert os.path.basename(str(paths.log_dir())) == "Ottilie"

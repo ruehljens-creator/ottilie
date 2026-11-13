@@ -13,7 +13,9 @@ Die Aufnahme- und Exportfunktionen von [PunchBuddy](https://github.com/ruehljens
 
 ## Download
 
-Fertiges Paket im Release [v0.1](../../releases/tag/v0.1): `Ottilie-0.1-apple-silicon.dmg` (Apple Silicon, macOS 26).
+Fertige Pakete im Release [v0.3](../../releases/tag/v0.3): `Ottilie-0.3-apple-silicon.dmg` und `Ottilie-0.3-intel.dmg`
+(macOS 26). Ab 0.3 läuft Ottilie nur mit der Ottilie-Zentrale (`zentrale/`); die letzte Fassung, die auch ohne
+Zentrale läuft, ist [v0.2](../../releases/tag/v0.2).
 Was jede Version enthält: [CHANGELOG.md](CHANGELOG.md).
 
 ## Schnellstart
@@ -42,7 +44,7 @@ Verbindungsfehler, alles andere lässt sich trotzdem ansehen.
 
 ## Stand
 
-Version 0.1, in der Erprobung. Gegen Pro Tools 2026 live geprüft; Helmut bisher nur gegen den Mock nach der
+Version 0.3, in der Erprobung. Gegen Pro Tools 2026 live geprüft; Helmut bisher nur gegen den Mock nach der
 offiziellen OpenAPI. Was gegen die echte Helmut-Instanz noch zu prüfen ist, steht in
 `docs/Ottilie_an_Helmut.html`.
 

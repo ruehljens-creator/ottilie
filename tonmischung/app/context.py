@@ -35,7 +35,7 @@ def dev_mock() -> MockHelmut:
 @dataclass
 class AppContext:
     settings: Settings
-    helmut: HelmutClient
+    helmut: HelmutClient                         # bzw. ModeClient: Helmut-API oder Übergabeordner (Betriebsart)
     ptsl: PtslClient
     mixer: str
     room: str
@@ -61,6 +61,11 @@ class AppContext:
             for path in (pl.parent, pl.mirror_parent):
                 if path and not inside(path, self.safe_root):
                     raise storage.StorageError(f"Im Entwicklungsmodus nur im Testordner – {path} liegt außerhalb")
+        film = (contribution.raw or {}).get("ordner") if self.folder_mode else ""
+        if film:                                     # Spiegel im Filmordner: kein Symlink hinaus (Sicherheit 1)
+            for path in (pl.parent, pl.mirror_parent):
+                if path and inside(path, film) and not storage.real_inside(path, film):
+                    raise storage.StorageError(f"{path} führt über einen Verweis (Symlink) aus dem Filmordner hinaus")
         return pl
 
     def service(self):
@@ -68,23 +73,60 @@ class AppContext:
         from tonmischung.helmut.service import MixService
         return MixService(self.helmut, self.mixer, self.room, queue=self.queue)
 
+    @property
+    def mode(self) -> str:
+        """Betriebsart: „helmut_api“ oder „uebergabeordner“ (Jens 11.11.2026)."""
+        from tonmischung.dropfolder.mode import mode_of
+        return mode_of(self.helmut)
+
+    @property
+    def folder_mode(self) -> bool:
+        from tonmischung.dropfolder.client import MODE_FOLDER
+        return self.mode == MODE_FOLDER
+
+    def delivery_target(self, project_id: str):
+        """Betriebsart Übergabeordner: Ziel des Zurücklieferns in „<Filmordner>/Audio Export“ (Funktion für
+        `workflow.deliver`); Helmut-API: None (Übergabeordner aus den Einstellungen)."""
+        return self.helmut.folder.delivery_target(project_id) if self.folder_mode else None
+
+    def target_text(self, project_id: str) -> str:
+        """Ziel des Zurücklieferns zum Anzeigen."""
+        if not self.folder_mode:
+            return self.handover_root.replace("{projektId}", project_id)
+        try:
+            return self.helmut.folder.export_dir(project_id)
+        except Exception as e:                       # Anzeige: Ordner gerade nicht erreichbar
+            return f"„Audio Export“ im Filmordner ({e})"
+
     @classmethod
     def create(cls, mock: bool = False) -> "AppContext":
         from tonmischung import __version__, factory
+        from tonmischung.dropfolder.mode import ModeClient
         s = factory.load_settings()
         mixer, room = factory.identity(s)
         if mock:
             m = dev_mock()
             url = m.start()
             folder = devlocal.test_folder()
-            return cls(s, HelmutClient(url, lambda: ("test", "test")), factory.ptsl_client(s), mixer, room,
-                       folder, m, __version__,
-                       handover_root=os.path.join(folder, "Helmut-Uebergabe", "{projektId}"),
-                       queue=CatchUpQueue(default_path(mock=True)), safe_root=folder)
-        return cls(s, factory.helmut_client(s), factory.ptsl_client(s), mixer, room,
-                   s.get("import.session_ablage.lokaler_ordner"), None, __version__,
-                   handover_root=s.get("export.verarbeitung_helmut.uebergabeordner"),
-                   queue=CatchUpQueue(default_path()))
+            api = HelmutClient(url, lambda: ("test", "test"))
+            ctx = cls(s, api, factory.ptsl_client(s), mixer, room, folder, m, __version__,
+                      handover_root=os.path.join(folder, "Helmut-Uebergabe", "{projektId}"),
+                      queue=CatchUpQueue(default_path(mock=True)), safe_root=folder)
+        else:
+            from tonmischung.core.machine_data import CATCH_UP
+            data_dir, hint, _notes = factory.machine_dir(s)     # Nachtrag & Co. für alle Benutzer des Macs
+            api = factory.helmut_client(s)
+            ctx = cls(s, api, factory.ptsl_client(s), mixer, room,
+                      s.get("import.session_ablage.lokaler_ordner"), None, __version__,
+                      handover_root=s.get("export.verarbeitung_helmut.uebergabeordner"),
+                      queue=CatchUpQueue(data_dir / CATCH_UP))
+            ctx.extra["datenordner"], ctx.extra["datenordner_hinweis"] = data_dir, hint
+        ctx.helmut = ModeClient(api, lambda: factory.folder_client(s, lambda: (ctx.mixer, ctx.room),
+                                                                   safe_root=ctx.safe_root),
+                                lambda: factory.operating_mode(s))
+        if ctx.queue is not None:
+            ctx.queue.target = lambda: factory.queue_target(ctx.helmut)
+        return ctx
 
     def close(self) -> None:
         """Beim Beenden: PTSL-Verbindung schließen (sonst CLOSE_WAIT in Pro Tools), Mock stoppen."""

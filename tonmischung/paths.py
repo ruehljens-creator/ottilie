@@ -1,7 +1,7 @@
 """Name und Ablageorte der App.
 
 Jens 08.10.2026: „Die App soll ab jetzt nicht mehr Tonmischung heißen, sondern Ottilie, und das Bild ist das Logo.“
-Alles, was Nutzer, Geräteverwaltung und das System sehen, heißt Ottilie (Bundle-ID, Datenordner, Protokolle, Bonjour,
+Alles, was Nutzer, Geräteverwaltung und das System sehen, heißt Ottilie (Bundle-ID, Datenordner, Protokolle,
 Schlüsselbund). Der Code-Name `tonmischung` bleibt intern (Python-Paket, `python3 -m tonmischung`, Formatkennungen
 in Dateien).
 

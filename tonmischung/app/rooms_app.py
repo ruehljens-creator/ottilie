@@ -1,90 +1,94 @@
-"""Räume im Fenster: Raumübersicht (wer mischt wo) und Räume über Mac-Namen (Plan Nutzer & Räume, Schritt 4:
-Liste Raum ↔ Mac, Mac aus einer Auswahl)."""
+"""Räume im Fenster: Raumübersicht (wer mischt wo) und die einmalige Umstellung der früheren Raumliste.
+
+Seit 13.11.2026 (Jens: „Raum mit Namen fest zuordnen – in der Zentrale auf der Adminseite“) gibt es keine Raumliste
+in Ottilie mehr. Gekoppelt gilt der Raum der Zentrale, sonst „Raumname dieses Macs“ oder der Rechnername. Was die
+alte Liste für diesen Mac enthielt (Name, Webtrigger-ID-Code), übernimmt `migrate_legacy` einmal in die neuen
+Einstellungen.
+"""
 from __future__ import annotations
 
 import logging
+import os
 import socket
+from collections.abc import Mapping
 from typing import Any
 
 from tonmischung.app.bridge import Bridge, CommandError
 from tonmischung.app.context import AppContext
-from tonmischung.core import rooms as R
-from tonmischung.core.identity import short_host, this_room
+from tonmischung.core.fileio import CorruptFileError, read_json
+from tonmischung.core.identity import short_host
 
 log = logging.getLogger(__name__)
 
-PATH = "system.raeume_nutzer.raeume"
-P = "system.raeume_nutzer."
+ROOM_NAME = "system.raeume_nutzer.raumname"
+ID_CODE = "system.streamdeck_webtrigger.id_code"
+LEGACY_ROOMS = "system.raeume_nutzer.raeume"        # bis 0.2: Raumliste (Raum ↔ Rechnername, ID-Code)
+LEGACY_FILE = "raeume.json"                         # bis 0.2: Raumliste in der Ablage der Nutzer
 
 
-def _root(ctx: AppContext) -> str:
+def legacy_entry(local: Mapping[str, Any], shared: list | None, hostname: str) -> dict:
+    """Eintrag dieses Macs aus der früheren Raumliste (lokal oder in der Ablage) bzw. dem festen Raum – {} ohne."""
+    if local.get("system.raeume_nutzer.raum_erkennung") == "fest" and local.get("system.raeume_nutzer.raum_fest"):
+        fixed = str(local["system.raeume_nutzer.raum_fest"])
+        rows = list(shared or []) + list(local.get(LEGACY_ROOMS) or [])
+        hit = next((r for r in rows if isinstance(r, Mapping) and fixed in (r.get("id"), r.get("name"))), {})
+        return {"name": str(hit.get("name") or fixed), "id_code": str(hit.get("id_code") or "")}
+    host = short_host(hostname)
+    for rows in (shared or [], local.get(LEGACY_ROOMS) or []):
+        for r in rows:
+            if isinstance(r, Mapping) and short_host(str(r.get("rechnername") or "")) == host and r.get("name"):
+                return {"name": str(r["name"]), "id_code": str(r.get("id_code") or "")}
+    return {}
+
+
+def _shared_rows(ctx: AppContext) -> list | None:
+    """Frühere Raumliste in der Ablage der Nutzer – None ohne (oder unlesbar)."""
     from tonmischung.app.users_app import store_root
-    return store_root(ctx)
+    try:
+        data = read_json(os.path.join(store_root(ctx), LEGACY_FILE))
+    except (CorruptFileError, OSError):
+        return None
+    rows = data.get("raeume") if isinstance(data, Mapping) else data
+    return rows if isinstance(rows, list) else None
 
 
-def _apply(ctx: AppContext, rows: list[dict], hostname: str | None = None) -> None:
-    """Raumliste gilt (Ebene „zentral“), Raum dieses Macs neu bestimmen."""
-    ctx.settings.update_central({PATH: rows} if rows else {})
+MIGRATED = "raumliste-umgestellt"                   # Merker neben den lokalen Einstellungen: nur einmal umstellen
+
+
+def migrate_legacy(ctx: AppContext, hostname: str | None = None) -> None:
+    """Einmal: Raumname und ID-Code dieses Macs aus der früheren Raumliste übernehmen (nur, wo noch nichts steht).
+    Danach nie wieder (Review 13.11.2026: sonst kam ein entfernter ID-Code nach jedem Neustart zurück)."""
     s = ctx.settings
-    room = this_room(rows, hostname or socket.gethostname(), s.get(P + "raum_erkennung"), s.get(P + "raum_fest") or "")
-    ctx.room = room or short_host(hostname or socket.gethostname())
+    marker = s.local_path.with_name(MIGRATED) if s.local_path else None
+    if marker is not None and marker.exists():
+        return
+    local = {**s.unknown_local(), **s.local_values()}
+    shared = _shared_rows(ctx)
+    if shared or LEGACY_ROOMS in local or "system.raeume_nutzer.raum_fest" in local:
+        entry = legacy_entry(local, shared, hostname or socket.gethostname())
+        for path, value in ((ROOM_NAME, entry.get("name", "")), (ID_CODE, entry.get("id_code", ""))):
+            if value and not local.get(path) and not s.locked(path):
+                s.set_local(path, value)
+                log.info("Aus der früheren Raumliste übernommen: %s", path)
+    if marker is not None:
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text("Raumliste bis Ottilie 0.2 übernommen – nicht noch einmal\n", encoding="utf-8")
+        except OSError as e:
+            log.warning("Merker der Raumlisten-Umstellung nicht geschrieben: %s", e)
 
 
 def startup(ctx: AppContext, hostname: str | None = None) -> None:
-    """Raumliste aus der Ablage; gibt es dort keine, wird die bisherige Einstellung des Macs übernommen."""
-    root = _root(ctx)
-    ctx.extra["rooms_root"] = root
-    ctx.extra.pop("rooms_problem", None)
+    """Beim Start: alte Raumliste umstellen, Raum dieses Macs (ohne Zentrale) bestimmen."""
     try:
-        rows = R.load(root)
-    except R.RoomsUnreadable as e:
-        log.warning("%s – Raumliste bleibt, wie sie ist", e)
-        ctx.extra["rooms_problem"] = str(e)
-        _apply(ctx, [dict(r) for r in (ctx.settings.local_values().get(PATH) or [])], hostname)
-        return
-    if rows is None:
-        rows = [dict(r) for r in (ctx.settings.local_values().get(PATH) or [])]
-        if rows:
-            try:
-                R.save(root, rows)
-                log.info("Raumliste in die Ablage übernommen: %d Räume", len(rows))
-            except OSError as e:
-                log.warning("Raumliste nicht gespeichert: %s", e)
-    _apply(ctx, rows, hostname)
-
-
-def view(ctx: AppContext, message: str = "", errors: list[str] | None = None) -> dict[str, Any]:
-    # Ablage gewechselt bzw. erneut versuchen
-    if ctx.extra.get("rooms_root") != _root(ctx) or ctx.extra.get("rooms_problem"):
-        startup(ctx)
-    rows = [dict(r) for r in (ctx.settings.get(PATH) or [])]
-    peers = ctx.extra.get("peers")
-    hosts = [p.host for p in peers.peers().values()] if peers is not None and getattr(peers, "available", False) else []
-    problem = ctx.extra.get("rooms_problem")
-    return {"rooms": rows, "macs": R.known_macs(socket.gethostname(), hosts, rows),
-            "this_mac": short_host(socket.gethostname()), "this_room": ctx.room, "ablage": _root(ctx),
-            "message": message, "errors": (errors or []) + ([f"{problem} – bitte prüfen; gespeichert wird erst nach "
-                                                             "Behebung"] if problem else [])}
-
-
-def save(ctx: AppContext, args: dict) -> dict[str, Any]:
-    if ctx.extra.get("rooms_problem"):
-        raise CommandError("Die Raumliste in der Ablage ist nicht lesbar – erst prüfen, sonst ginge sie verloren")
-    rows, errors = R.normalize(args.get("rooms") or [])
-    if errors:
-        return view(ctx, "", errors)
-    try:
-        R.save(_root(ctx), rows)
-    except OSError as e:
-        raise CommandError(f"Raumliste nicht gespeichert: {e}") from e
-    before = ctx.room
-    _apply(ctx, rows)
-    note = f"{len(rows)} Räume gespeichert" + (f" – dieser Mac ist jetzt „{ctx.room}“" if ctx.room != before else "")
-    return view(ctx, note)
+        migrate_legacy(ctx, hostname)
+    except Exception as e:  # noqa: BLE001 – die Umstellung darf den Start nie aufhalten
+        log.warning("Frühere Raumliste nicht übernommen: %s", e)
+    ctx.room = str(ctx.settings.get(ROOM_NAME) or "").strip() or short_host(hostname or socket.gethostname())
 
 
 def overview(ctx: AppContext) -> dict:
-    """Raumübersicht: Stand jedes Raums aus Helmut und direkt von den anderen Macs (Bonjour)."""
+    """Raumübersicht: Räume der Zentrale mit ihrem Stand, ergänzt um Helmut bzw. die Sperrdateien."""
     from tonmischung.app.roomstatus import rooms
     from tonmischung.helmut.client import HelmutError
     try:
@@ -95,5 +99,3 @@ def overview(ctx: AppContext) -> dict:
 
 def register(bridge: Bridge, ctx: AppContext) -> None:
     bridge.register("raeume", lambda args: overview(ctx))
-    bridge.register("raumliste", lambda args: view(ctx))
-    bridge.register("raumliste_speichern", lambda args: save(ctx, args))

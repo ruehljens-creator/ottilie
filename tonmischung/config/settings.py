@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from tonmischung.core.fileio import CorruptFileError, read_json, set_aside, write_json
-from tonmischung.core.settings_transfer import MACHINE_EXTRA
 from tonmischung.paths import BUNDLE_ID, support_dir
 
 log = logging.getLogger(__name__)
@@ -119,7 +118,7 @@ def read_managed(domain: str = PREFERENCE_DOMAIN) -> ManagedReader:
 
 
 # Was am Mac bleibt, auch wenn ein Nutzer angemeldet ist (Jens 04.10.2026: „Gerätebezogenes bleibt am Mac“): Quelle
-# „lokal“ oder „mdm“, dazu diese Bereiche und der Raum (`MACHINE_EXTRA`). Alles andere hängt am Nutzer.
+# „lokal“ oder „mdm“, dazu diese Bereiche. Alles andere hängt am Nutzer.
 MAC_SECTIONS = ("import.session_ablage", "export.dateiexporte", "export.verarbeitung_helmut", "system")
 
 
@@ -138,6 +137,9 @@ class Settings:
         self.local_path = Path(local_path) if local_path else None  # type: ignore[arg-type]
         self.local_problem = ""                  # Hinweis fürs Fenster, wenn die Datei beschädigt/unlesbar war
         self._local_blocked = False              # unlesbar (nicht beschädigt): nie überschreiben
+        # Schlüssel, die diese Version nicht kennt (z. B. die Raumliste bis 0.2): bleiben unverändert in der Datei –
+        # nichts geht verloren, ein Zurück auf die ältere Version findet sie wieder (13.11.2026)
+        self._unknown: dict[str, Any] = {}
         self._lock = threading.RLock()           # Fenster, Aufträge und Takte schreiben aus mehreren Threads
         self._managed = managed
         self._central = dict(central or {})
@@ -184,7 +186,7 @@ class Settings:
     def is_user_path(self, path: str) -> bool:
         """Hängt am Nutzer (nicht am Mac)?"""
         info = self.fields.get(path)
-        if info is None or info.source in ("lokal", "mdm") or path in MACHINE_EXTRA:
+        if info is None or info.source in ("lokal", "mdm"):
             return False
         return not any(path == s or path.startswith(s + ".") for s in MAC_SECTIONS)
 
@@ -201,15 +203,14 @@ class Settings:
     def clear_user_layer(self) -> None:
         self._user, self._user_writer, self.user_label = {}, None, ""
 
-    def user_values(self) -> dict[str, Any]:
-        return dict(self._user)
-
     # ── Zentrale Daten (Helmut, später optional Datenbank) ───────────────────
     def update_central(self, values: Mapping[str, Any]) -> None:
+        """Ebene „zentral“: Vorgaben der Ottilie-Zentrale – ersetzt die bisherigen ganz."""
         unknown = [k for k in values if k not in self.fields]
         if unknown:
             log.warning("Zentrale Daten mit unbekannten Einstellungen ignoriert: %s", unknown)
-        self._central = {k: v for k, v in values.items() if k in self.fields}
+        with self._lock:
+            self._central = {k: v for k, v in values.items() if k in self.fields}
 
     # ── Spurprofil der offenen Session ───────────────────────────────────────
     def set_profile_layer(self, values: Mapping[str, Any], label: str) -> None:
@@ -222,17 +223,15 @@ class Settings:
 
     # ── Lokal schreiben ──────────────────────────────────────────────────────
     def local_values(self) -> dict[str, Any]:
-        """Was auf diesem Mac eingestellt ist (lokale Ebene) – für den Export der Einstellungen."""
+        """Was auf diesem Mac eingestellt ist (lokale Ebene)."""
         return dict(self._local)
 
-    def set_local(self, path: str, value: Any, under_profile: bool = False) -> None:
-        """`under_profile`: auch schreiben, wenn das Spurprofil der offenen Session den Wert gerade vorgibt
-        (Import der Einstellungen); in den Formularen bleibt das gesperrt."""
+    def set_local(self, path: str, value: Any) -> None:
         if path not in self.fields:
             raise KeyError(f"Unbekannte Einstellung: {path}")
         if self.locked(path):
             raise SettingLockedError(f"{path} ist über die Geräteverwaltung festgelegt und gesperrt")
-        if path in self._profile and not under_profile:
+        if path in self._profile:
             raise SettingLockedError(f"Gilt gerade aus dem Spurprofil „{self.profile_label}“ der offenen Session – "
                                      "dort ändern (Import › Spurprofile)")
         with self._lock:
@@ -277,7 +276,12 @@ class Settings:
             self.local_problem = f"Einstellungsdatei nicht lesbar ({e}) – Änderungen werden nicht gespeichert"
             log.error("Lokale Einstellungen: %s", self.local_problem)
             return {}
+        self._unknown = {k: v for k, v in (data or {}).items() if k not in self.fields}
         return {k: v for k, v in (data or {}).items() if k in self.fields}
+
+    def unknown_local(self) -> dict[str, Any]:
+        """Lokale Werte, die diese Version nicht kennt (für einmalige Umstellungen, z. B. die frühere Raumliste)."""
+        return dict(self._unknown)
 
     def _write_local(self) -> None:
         if not self.local_path:
@@ -285,7 +289,7 @@ class Settings:
         if self._local_blocked:
             raise SettingLockedError(self.local_problem)
         with self._lock:
-            write_json(self.local_path, dict(self._local), indent=2, sort_keys=True)
+            write_json(self.local_path, {**self._unknown, **self._local}, indent=2, sort_keys=True)
 
 
 def validate(node: Mapping, value: Any, label: str = "Wert") -> list[str]:

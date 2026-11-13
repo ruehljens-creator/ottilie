@@ -7,7 +7,7 @@ steht in `helmut/catchup.py`.
 """
 from __future__ import annotations
 
-import fcntl
+import getpass
 import logging
 import os
 import threading
@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from tonmischung.core import mixstate
-from tonmischung.core.fileio import CorruptFileError, read_json, set_aside, write_json
+from tonmischung.core.fileio import SHARED_FILE_MODE, CorruptFileError, file_lock, read_json, set_aside, write_json
 from tonmischung.core.mixstate import MixState
 
 log = logging.getLogger(__name__)
@@ -27,7 +27,17 @@ log = logging.getLogger(__name__)
 MIX, LOCK, ASSET, NOTIFY, TAKE = "mischung", "sperre", "asset", "nachricht", "uebernahme"
 OPEN, DONE, CONFLICT = "offen", "erledigt", "konflikt"
 APPLY = "schreiben"
+ASSET_LABEL = {"tonspur": "WAV", "metadaten": "Metadaten-Datei", "session": "Session-Spiegel"}   # sonst „Datei“
 HINT = "Helmut ist nicht erreichbar – wird nachgetragen, sobald Helmut wieder da ist"
+HINT_AUTH = "Anmeldung bei Helmut nicht möglich – wird nachgetragen, sobald sie wieder gelingt"
+
+
+def current_user() -> str:
+    """macOS-Benutzer dieses Prozesses – Urheber eines Eintrags im gemeinsamen Nachtrag (Auftrag „rechnerweit“)."""
+    try:
+        return getpass.getuser()
+    except (KeyError, OSError):
+        return str(os.getuid())
 
 
 def default_path(mock: bool = False) -> Path:
@@ -46,8 +56,8 @@ class Entry:
     project_id: str
     title: str = ""
     created: str = ""
-    expect_mixer: str = ""          # MIX: der Beitrag muss noch diesem Mischer …
-    expect_room: str = ""           # … in diesem Raum gehören
+    expect_mixer: str = ""          # MIX/ASSET: der Beitrag muss noch diesem Mischer …
+    expect_room: str = ""           # … in diesem Raum gehören (ASSET: oder von ihm ausgeliefert sein)
     changes: dict = field(default_factory=dict)     # MIX: MixState-Felder → neuer Wert
     locked: bool = False            # LOCK
     path: str = ""                  # ASSET
@@ -56,6 +66,12 @@ class Entry:
     subject: str = ""
     text: str = ""
     havarie: str = ""               # Havarie-Kennung: Einträge eines manuell geöffneten Pakets
+    # Gemeinsamer Nachtrag aller Benutzer des Macs (Ausfall/Sicherheit 13.11.2026): wer ihn angelegt hat und wohin er
+    # gehört. Ein anderer Benutzer trägt ihn nur nach, wenn Betriebsart und Fertigmeldung bei ihm gleich sind – sonst
+    # ginge eine Fertigmeldung mit fremden Einstellungen hinaus oder würde ungesendet als erledigt abgehakt.
+    benutzer: str = ""              # macOS-Benutzer
+    betriebsart: str = ""           # „helmut_api“ / „uebergabeordner“
+    meldung: str = ""               # Metadaten im Ordnerbetrieb: Fingerabdruck des Fertigmeldungs-Ziels
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     status: str = OPEN
     attempts: int = 0
@@ -66,7 +82,8 @@ class Entry:
         what = {TAKE: "übernehmen",
                 MIX: f"Zustand „{mixstate.STATE_LABEL.get(state, state)}“" if state else "Set „Mischung“",
                 LOCK: "sperren" if self.locked else "entsperren",
-                ASSET: f"Asset {os.path.basename(self.path)}", NOTIFY: f"Nachricht an {self.user}"}[self.kind]
+                ASSET: f"{ASSET_LABEL.get(self.asset_kind, 'Datei')} {os.path.basename(self.path)}",
+                NOTIFY: f"Nachricht an {self.user}"}[self.kind]
         return f"{self.title or self.project_id}: {what}"
 
 
@@ -103,6 +120,8 @@ class CatchUpQueue:
     def __init__(self, path: Path | None = None, now: Callable[[], str] = _now) -> None:
         self.path = Path(path) if path else default_path()
         self._now = now
+        # (Betriebsart, Fingerabdruck der Fertigmeldung) dieses Prozesses – setzt, wer den Client kennt
+        self.target: Callable[[], tuple[str, str]] = lambda: ("", "")
         self.problem = ""                         # Hinweis fürs Fenster (beschädigte Datei beiseitegelegt)
         self._lock = threading.RLock()
         self._depth = 0                           # verschachtelte Änderungen (dismiss → mark) sperren nur einmal
@@ -126,7 +145,7 @@ class CatchUpQueue:
         if stamp == self._stamp:                  # unverändert (oder weiterhin keine Datei)
             return
         try:
-            raw = read_json(self.path, expect=dict)
+            raw = read_json(self.path, expect=dict, shared=True)
         except CorruptFileError as e:
             if not strict:
                 return
@@ -141,12 +160,22 @@ class CatchUpQueue:
                 return
             raise RuntimeError(f"Nachtrag-Datei {self.path} nicht lesbar: {e} – nichts überschrieben") from e
         known = {f.name for f in fields(Entry)}
-        self._entries = [Entry(**{k: v for k, v in e.items() if k in known})
-                         for e in (raw or {}).get("eintraege", []) if isinstance(e, dict)]
+        mix_fields = {f.name for f in fields(MixState)}
+        entries = []
+        for e in (raw or {}).get("eintraege", []):
+            if not isinstance(e, dict):
+                continue
+            entry = Entry(**{k: v for k, v in e.items() if k in known})
+            # Nur Felder des Sets „Mischung“ (Sicherheit 13.11.2026: die Datei kann jeder Benutzer des Macs ändern;
+            # ein fremdes Feld brach sonst das ganze Nachtragen ab)
+            entry.changes = {k: v for k, v in entry.changes.items() if k in mix_fields} \
+                if isinstance(entry.changes, dict) else {}
+            entries.append(entry)
+        self._entries = entries
         self._stamp = stamp
 
     def _save(self) -> None:
-        write_json(self.path, {"version": 1, "eintraege": [asdict(e) for e in self._entries]})
+        write_json(self.path, {"version": 1, "eintraege": [asdict(e) for e in self._entries]}, mode=SHARED_FILE_MODE)
         self._stamp = self._file_stamp()
 
     def _lock_path(self, kind: str) -> Path:
@@ -163,9 +192,7 @@ class CatchUpQueue:
                 finally:
                     self._depth -= 1
                 return
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self._lock_path("aendern"), "a") as lock:
-                fcntl.flock(lock, fcntl.LOCK_EX)
+            with file_lock(self._lock_path("aendern")):
                 self._depth = 1
                 try:
                     self._reload(strict=True)
@@ -173,7 +200,6 @@ class CatchUpQueue:
                     self._save()
                 finally:
                     self._depth = 0
-                    fcntl.flock(lock, fcntl.LOCK_UN)
 
     def _view(self) -> list[Entry]:
         with self._lock:
@@ -183,22 +209,24 @@ class CatchUpQueue:
 
     @contextmanager
     def replaying(self) -> Iterator[bool]:
-        """Nur ein Nachtragen zur Zeit – auch zwischen App und Kommandozeile. `False`: läuft schon woanders."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._lock_path("nachtragen"), "a") as lock:
-            try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                yield False
-                return
-            try:
-                yield True
-            finally:
-                fcntl.flock(lock, fcntl.LOCK_UN)
+        """Nur ein Nachtragen zur Zeit – auch zwischen App und Kommandozeile und zwischen den Benutzern des Macs.
+        `False`: läuft schon woanders."""
+        with file_lock(self._lock_path("nachtragen"), wait=False) as got:
+            yield got
 
     # ── Einträge ─────────────────────────────────────────────────────────
     def add(self, entry: Entry) -> Entry:
         entry.created = entry.created or self._now()
+        entry.benutzer = entry.benutzer or current_user()
+        if not entry.betriebsart:
+            try:
+                mode, note = self.target()
+            except Exception as e:  # noqa: BLE001 – ohne Ziel bleibt der Eintrag für jeden nachtragbar
+                log.warning("Nachtrag: Ziel nicht bestimmt (%s)", e)
+                mode, note = "", ""
+            entry.betriebsart = mode
+            if entry.kind == ASSET and entry.asset_kind == "metadaten":
+                entry.meldung = entry.meldung or note
         with self._changing():
             self._entries.append(entry)
         return entry
@@ -215,8 +243,9 @@ class CatchUpQueue:
     def add_lock(self, project_id: str, title: str, locked: bool, havarie: str = "") -> Entry:
         return self.add(Entry(LOCK, project_id, title, locked=locked, havarie=havarie))
 
-    def add_asset(self, project_id: str, title: str, path: str, kind: str) -> Entry:
-        return self.add(Entry(ASSET, project_id, title, path=path, asset_kind=kind))
+    def add_asset(self, project_id: str, title: str, path: str, kind: str, mixer: str = "", room: str = "") -> Entry:
+        return self.add(Entry(ASSET, project_id, title, path=path, asset_kind=kind, expect_mixer=mixer,
+                              expect_room=room))
 
     def add_notify(self, project_id: str, title: str, user: str, subject: str, text: str) -> Entry:
         return self.add(Entry(NOTIFY, project_id, title, user=user, subject=subject, text=text))
@@ -284,9 +313,13 @@ class CatchUpQueue:
         for e in entries:
             if e.status == OPEN and not e.project_id:
                 groups.setdefault(e.havarie, e.title)
+        me = current_user()
+        mine = lambda e: e.benutzer == me                                       # noqa: E731
         return {"offen": sum(e.status == OPEN and bool(e.project_id) for e in entries),
-                "eintraege": [{"id": e.id, "text": e.describe()} for e in entries
+                "eintraege": [{"id": e.id, "text": e.describe(), "grund": e.message,
+                               "benutzer": "" if mine(e) else e.benutzer, "zeit": e.created} for e in entries
                               if e.status == OPEN and e.project_id],
-                "konflikte": [{"id": e.id, "text": e.describe(), "grund": e.message}
-                              for e in entries if e.status == CONFLICT],
+                "fremde": sorted({e.benutzer for e in entries if e.status in (OPEN, CONFLICT) and not mine(e)}),
+                "konflikte": [{"id": e.id, "text": e.describe(), "grund": e.message,
+                               "benutzer": "" if mine(e) else e.benutzer} for e in entries if e.status == CONFLICT],
                 "ohne_beitrag": [{"id": h, "titel": t} for h, t in groups.items()]}

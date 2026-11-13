@@ -102,3 +102,4 @@ a{color:var(--accent)}a:hover{color:var(--accent-hover)}
 .room-chip{display:flex;align-items:center;gap:6px;height:28px;max-width:100%}
 .room-chip .ellip{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .room-chip:hover,.room-chip:focus-visible{border-color:var(--accent)}
+ul.plain{margin:0;padding-left:18px}

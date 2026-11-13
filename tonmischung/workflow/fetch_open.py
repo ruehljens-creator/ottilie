@@ -25,16 +25,16 @@ from tonmischung.core.session_rules import same_session
 from tonmischung.core.session_text import missing, track_clips
 from tonmischung.core.timecode import frames_to_tc, tc_to_frames
 from tonmischung.core.track_match import MAP, SKIP, TrackDecision, missing_tracks
-from tonmischung.helmut.client import HelmutUnavailableError
+from tonmischung.helmut.client import HelmutError
 from tonmischung.helmut.mapping import Contribution
-from tonmischung.helmut.service import MixService
+from tonmischung.helmut.service import QUEUED, MixService
 from tonmischung.ptsl.client import PtslClient
 from tonmischung.ptsl.errors import PtslError
 from tonmischung.sessions.runner import wait_for_transport_stop
 from tonmischung.workflow.fetch import (PROGRAM_START, SESSION_FPS, DecideMissing, FetchError, apply_track_view,
                                         at_session_rate, check_session_start, confirm_missing_media,
-                                        decide_missing_tracks, load_handover, mapped_names, restore_video_track,
-                                        sequence_offset)
+                                        decide_missing_tracks, handover_nr, load_handover, mapped_names,
+                                        restore_video_track, sequence_offset)
 from tonmischung.workflow.reopen import FOLDER, CopyPlan, check_copy, copy_session, open_and_wait
 
 OPEN_STEPS = [("Prüfen", 8), ("Übernehmen", 3), ("Session speichern", 4), ("Session umziehen", 20),
@@ -225,13 +225,16 @@ def fetch_into_open(project_id: str, *, service: MixService, ptsl: PtslClient, o
         storage = session_storage
         mirror = os.path.join(mirror_parent, name) if mirror_parent else ""
     c, hint = service.set_state_or_queue(c, mixstate.IMPORTED, session_path=session_path, session_storage=storage,
-                                         session_mirror=mirror)
+                                         session_mirror=mirror, **handover_nr(handover))
     if hint:
         warnings.append(hint)
     prev_title, prev_action = "", ""
     if previous is not None:
         prev_title = previous.title
-        prev_action, hint = _handle_previous(service, previous, options.previous, c)
+        try:                                 # der Import ist fertig – „Vorher“ darf ihn nicht scheitern lassen
+            prev_action, hint = _handle_previous(service, previous, options.previous, c)
+        except (HelmutError, mixstate.ConflictError) as e:
+            prev_action, hint = "unverändert", f"„{previous.title}“ in Helmut nicht geändert: {e}"
         if hint and hint not in warnings:
             warnings.append(hint)
     log(f"Fertig: {session_path}")
@@ -245,7 +248,7 @@ def _handle_previous(service: MixService, previous: Contribution, how: str, new:
         return "bleibt in Mischung", ""
     try:
         current = service.client.get(previous.id)
-    except HelmutUnavailableError:
+    except QUEUED:
         if service.queue is None:
             raise
         current = previous

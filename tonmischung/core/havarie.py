@@ -94,18 +94,22 @@ class PackageIndex:
     def _load(self) -> dict[str, str]:
         from tonmischung.core.fileio import CorruptFileError, read_json, set_aside
         try:
-            return read_json(self.path, expect=dict) or {}
+            return read_json(self.path, expect=dict, shared=True) or {}
         except CorruptFileError:
             set_aside(self.path)                       # nicht überschreiben – nur ein Merkzettel, neu beginnen
             return {}
         except OSError:
             return {}
 
+    def lock_path(self) -> str:
+        return os.path.splitext(self.path)[0] + ".lock"
+
     def remember(self, session_path: str, folder: str) -> None:
-        from tonmischung.core.fileio import write_json
-        data = self._load()
-        data[os.path.normpath(session_path)] = folder
-        write_json(self.path, data)                    # nur die eigene Verzeichnisdatei
+        from tonmischung.core.fileio import SHARED_FILE_MODE, file_lock, write_json
+        with file_lock(self.lock_path()):              # auch zwischen den Benutzern des Macs
+            data = self._load()
+            data[os.path.normpath(session_path)] = folder
+            write_json(self.path, data, mode=SHARED_FILE_MODE)      # nur die eigene Verzeichnisdatei
 
     def lookup(self, session_path: str) -> str:
         return self._load().get(os.path.normpath(session_path or ""), "") if session_path else ""

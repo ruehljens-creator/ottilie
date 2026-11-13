@@ -13,10 +13,10 @@ Alles, was das Fenster kann, geht auch über die Schnittstelle – nur auf diese
   - **Arbeitsabläufe** – wenn `system.schnittstellen.mcp_nur_lesen` aus ist (Standard: an)
   - **Verwalten** – zusätzlich `system.schnittstellen.mcp_verwalten_erlaubt` (Standard: aus)
   - `antworten` (Fragen eines Auftrags) – eigens `system.schnittstellen.mcp_antworten_erlaubt` (Standard: aus)
-- **Nur im Fenster änderbar** (über Socket und MCP gesperrt, beim Einstellungsimport übergangen): `system.schnittstellen.…`, `system.streamdeck_webtrigger.…` – Rechte der Schnittstellen, Helmut-Adresse, Werkzeuge, Webtrigger.
+- **Nur im Fenster änderbar** (über Socket und MCP gesperrt, beim Einstellungsimport übergangen): `system.schnittstellen.…`, `system.streamdeck_webtrigger.…`, `system.uebergabeordner.…`, `system.raeume_nutzer.datenordner` – Rechte der Schnittstellen, Helmut-Adresse, Werkzeuge, Webtrigger, Betriebsart und Fertigmeldung.
 - Die Stufen schützen vor ungewollten Aktionen über MCP-Werkzeuge; sie sind keine Grenze gegen Programme, die unter demselben Benutzer selbst den Socket ansprechen.
 
-84 Befehle: 30 Lesen, 27 Arbeitsabläufe (ändern), 27 Verwalten.
+81 Befehle: 30 Lesen, 27 Arbeitsabläufe (ändern), 24 Verwalten.
 
 ## Lesen
 
@@ -24,7 +24,7 @@ Alles, was das Fenster kann, geht auch über die Schnittstelle – nur auf diese
 
 Pro Tools (offene Session), Helmut, Mischer und Raum
 
-Ergebnis: version, pro_tools {ok, session}, helmut {ok, mock}, mixer, room
+Ergebnis: version, pro_tools {ok, session}, helmut {ok, mock}, betriebsart, mixer, room
 
 ### `beitraege`
 
@@ -80,6 +80,18 @@ Pro Tools abfragen (nur lesen): Transport, Spuren, Session, Auswahl, Marker
 
 Ergebnis: je nach Abfrage, z. B. transport oder spuren [{name, typ, clips, format}]
 
+### `zentrale`
+
+Zentrale: Adresse, Verbindung, Kopplung (ohne Schlüssel), zentral vorgegebene Einstellungen
+
+Ergebnis: adresse, zustand, text, verbunden, gekoppelt, raum_zentrale, zentral_vorgegeben
+
+### `uebergabeordner`
+
+Betriebsart und Übergabeordner: erreichbar, beschreibbar, Filme
+
+Ergebnis: betriebsart, ordner, erreichbar, beschreibbar, meldung, filme {bereit, unvollstaendig, wird_uebertragen}, fertigmeldung {aktiv, url}
+
 ### `zurueckliefern_info`
 
 Übersicht vor dem Zurückliefern
@@ -88,7 +100,7 @@ Ergebnis: je nach Abfrage, z. B. transport oder spuren [{name, typ, clips, forma
 |---|---|---|---|
 | `id` | str |  | Projekt-ID |
 
-Ergebnis: session, tracks, missing, target, lufs, truepeak
+Ergebnis: session, tracks, missing, target, lufs, truepeak, videoid
 
 ### `ping`
 
@@ -111,12 +123,6 @@ Ergebnis: geaendert (true/false), auftrag
 Raumübersicht: je Raum Nutzer, Mischer, Zustand, Beitrag, Fortschritt
 
 Ergebnis: cards [{name, here, st, label, user, title, pct, online}], busy, source
-
-### `raumliste`
-
-Raumliste (Raum ↔ Mac) und die Macs zur Auswahl
-
-Ergebnis: rooms [{id, name, rechnername}], macs, this_mac, this_room, ablage
 
 ### `nutzer`
 
@@ -145,16 +151,6 @@ Felder eines Abschnitts: Wert, Herkunft (Nutzer, Mac, zentral, Geräteverwaltung
 | `id` | str | ja | Abschnitt, z. B. export.spuren_lautheit |
 
 Ergebnis: title, groups [{fields [{path, label, value, source, locked, options}]}]
-
-### `einstellungen_import_pruefen`
-
-Einstellungsdatei lesen und zeigen, was übernommen würde (ändert nichts)
-
-| Argument | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `pfad` | str | ja | Pfad der .json |
-
-Ergebnis: path, choices, unknown
 
 ### `spurprofile`
 
@@ -286,12 +282,13 @@ Ergebnis: Auftrag (siehe auftrag)
 
 ### `zurueckliefern`
 
-Mischung zurückliefern: konsolidieren, R128, WAVs an Helmut
+Mischung zurückliefern: konsolidieren, R128, WAVs und Metadaten-Datei an Helmut
 
 | Argument | Typ | Pflicht | Bedeutung |
 |---|---|---|---|
 | `id` | str |  | Projekt-ID |
 | `tracks` | str |  | Exportspuren, kommagetrennt (sonst Spurtabelle) |
+| `videoid` | str |  | VideoID (ohne Angabe bleibt die in Helmut) |
 
 Ergebnis: Auftrag
 
@@ -552,27 +549,6 @@ Eine Einstellung auf den geerbten Wert zurücksetzen
 
 Ergebnis: Feld
 
-### `einstellungen_exportieren`
-
-Geänderte Einstellungen in eine Datei schreiben (nie überschreiben)
-
-| Argument | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `ziel` | str | ja | Ordner oder .json-Pfad |
-
-Ergebnis: message, path
-
-### `einstellungen_importieren`
-
-Einstellungen aus einer Datei übernehmen (Auswahl aus einstellungen_import_pruefen)
-
-| Argument | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `pfad` | str | ja | Pfad der .json |
-| `auswahl` | list | ja | Liste der Schlüssel |
-
-Ergebnis: message
-
 ### `nutzer_anlegen`
 
 Nutzer anlegen (startet mit dem Hausstandard)
@@ -625,16 +601,6 @@ Nutzer an diesem Mac anmelden (nicht während eines Auftrags)
 | `standard` | bool |  | auch als Standard-Nutzer dieses Macs, true/false |
 
 Ergebnis: users, current
-
-### `raumliste_speichern`
-
-Raumliste speichern (Raum ↔ Mac)
-
-| Argument | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `rooms` | list | ja | Liste [{name, rechnername, id_code}] |
-
-Ergebnis: rooms, message, errors
 
 ### `vorlage_hochladen`
 
@@ -832,10 +798,19 @@ Ergebnis: wie vocaster_info, dazu meldung
 | `ready` | meldet das Fenster bereit (intern) |
 | `auswahl` | Auswahl im Fenster (für den Webtrigger /import) |
 | `kopieren` | Zwischenablage des Fensters |
+| `videoid_einfuegen` | liest die Zwischenablage dieses Macs |
 | `webtrigger_adressen` | enthält den Webtrigger-Schlüssel – der geht nie an KI-Assistenten |
 | `id_code_erzeugen` | antwortet mit den Webtrigger-Adressen samt Schlüssel |
 | `id_code_entfernen` | antwortet mit den Webtrigger-Adressen samt Schlüssel |
 | `launcher_erzeugen` | legt Startprogramme an und öffnet den Finder |
+| `fertigmeldung_testen` | sendet an den eingestellten Dienst, mit Anmeldung aus dem Schlüsselbund – löst nur ein Mensch im Einstellungsfenster aus |
+| `zentrale_koppeln` | legt die Kopplung rechnerweit ab (Administrator-Dialog) – nur ein Mensch am Mac |
+| `zentrale_anmelden` | legt die Anmeldung rechnerweit ab (Administrator-Dialog) – nur ein Mensch am Mac |
+| `zentrale_neu_verbinden` | Verbindung zur Zentrale neu aufbauen (Knopf im Fenster) |
+| `chat` | Chat der Zentrale – Inhalte gehen nie an Schnittstellen oder KI-Assistenten |
+| `chat_senden` | Chat der Zentrale – nur Menschen schreiben |
+| `chat_gelesen` | Chat der Zentrale (Lesestand) |
+| `chat_oeffnen` | Chat der Zentrale – nur Menschen öffnen Gespräche |
 
 ## Automation
 

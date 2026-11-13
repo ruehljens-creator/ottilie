@@ -46,6 +46,16 @@ def project_folder(raw: Mapping, isdir: Callable[[str], bool] = os.path.isdir) -
     return None
 
 
+def real_inside(path: str, folder: str) -> bool:
+    """Liegt `path` auch nach Auflösen aller Verweise (Symlinks) im Ordner? Der Pfad muss noch nicht existieren: der
+    nächste vorhandene Elternordner zählt."""
+    probe = os.path.abspath(path)
+    while not os.path.exists(probe) and os.path.dirname(probe) != probe:
+        probe = os.path.dirname(probe)
+    real, base = os.path.realpath(probe), os.path.realpath(folder)
+    return real == base or real.startswith(base.rstrip(os.sep) + os.sep)
+
+
 def resolve(template: str, project: str | None, show: str, title: str, version: str = "") -> str:
     """Platzhalter {projekt}, {sendung}, {titel}, {version} ersetzen; {projekt} ist ein Pfad, der Rest Namen."""
     if "{projekt}" in template and not project:

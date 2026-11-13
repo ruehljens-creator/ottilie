@@ -36,8 +36,7 @@ def test_cli_helmut_gegen_mock(monkeypatch, capsys):
         monkeypatch.setattr(factory.getpass, "getuser", lambda: "jens")
         monkeypatch.setattr(factory.socket, "gethostname", lambda: "ton3-mac")
         assert cli.main(["einstellungen", "system.schnittstellen.helmut.adresse", f'"{url}"']) == 0
-        assert cli.main(["einstellungen", "system.raeume_nutzer.raeume",
-                         '[{"id": "r3", "name": "Ton 3", "rechnername": "ton3-mac"}]']) == 0
+        assert cli.main(["einstellungen", "system.raeume_nutzer.raumname", '"Ton 3"']) == 0
         capsys.readouterr()
         assert cli.main(["helmut", "liste"]) == 0
         assert "p3  Kita-Streik  [Heimatjournal]  in_mischung · A. Wolf (Ton 2)" in capsys.readouterr().out

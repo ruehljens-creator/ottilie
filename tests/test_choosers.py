@@ -20,12 +20,3 @@ def test_skripte_und_abbrechen(monkeypatch):
                      'POSIX path of (choose folder with prompt "Übergabepaket wählen")']
 
 
-def test_einstellungsexport_mit_eigener_beschriftung(monkeypatch):
-    from tonmischung.app import settings_transfer_app as STA
-    asked = []
-    monkeypatch.setattr(STA, "choose_save", lambda name, prompt: asked.append((name, prompt)) or "")
-    settings = types.SimpleNamespace(local_values=lambda: {"a": 1}, user_values=lambda: {}, user_active=False,
-                                     is_user_path=lambda p: False)
-    ctx = types.SimpleNamespace(room="Ton 3", settings=settings)
-    assert STA.export_all(ctx)["message"] == "Export abgebrochen"
-    assert asked == [("Ottilie Einstellungen Ton 3.json", "Einstellungen exportieren")]

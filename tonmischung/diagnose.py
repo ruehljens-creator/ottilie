@@ -169,12 +169,36 @@ def app_log() -> str:
     return logfile.redact("\n\n".join(parts)) or "(leer)"          # auch ältere Protokolle ohne Schlüssel
 
 
+def zentrale(settings: Any) -> str:
+    """Kopplung, Adresse, gemeinsamer Datenordner und zuletzt bekannter Raum (IT-Administrator 13.11.2026: der
+    Support sah davon vorher nichts) – ohne Schlüssel, ohne etwas anzulegen."""
+    import os
+
+    from tonmischung.core import machine_data as MD
+    from tonmischung.zentrale import device as D
+    from tonmischung.zentrale import state as S
+    dev = D.read()
+    lines = [f"Kopplung: an {dev.address}, Code {dev.fingerprint}, Raum bei der Kopplung „{dev.room or '–'}“"
+             if dev is not None else "Kopplung: keine",
+             f"Adresse in den Einstellungen: {settings.get('system.zentrale.adresse') or '–'}"]
+    folder = Path(os.path.expanduser(str(settings.get(MD.SETTING) or "").strip() or MD.DEFAULT))
+    usable = folder.is_dir() and not folder.is_symlink() and os.access(folder, os.W_OK | os.X_OK)
+    lines.append(f"Gemeinsamer Datenordner: {folder} – {'nutzbar' if usable else 'NICHT nutzbar (Benutzerordner)'}")
+    if usable and dev is not None:
+        lines.append(f"Zuletzt bekannter Raum: {S.read(folder, S.ROOM, dev.fingerprint).get('raum') or '–'}")
+        for name in (MD.CATCH_UP, MD.MIXES, MD.PACKAGES):
+            f = folder / name
+            lines.append(f"  {name}: {f.stat().st_size} Bytes" if f.is_file() else f"  {name}: –")
+    return "\n".join(lines)
+
+
 # ── Bericht ────────────────────────────────────────────────────────────────
 def report(settings: Any, version: str, ptsl: Any = None, run: Run = run_cmd) -> str:
     sections: list[tuple[str, Callable[[], str]]] = [
         ("Übersicht", lambda: head(version, run)),
         ("Pro Tools", lambda: pro_tools(ptsl, run)),
         ("Webtrigger und Stream-Deck-Socket (Selbsttest)", lambda: triggers(settings)),
+        ("Zentrale und gemeinsamer Datenordner", lambda: zentrale(settings)),
         *system(run),
         ("Focusrite Vocaster", vocaster),
         ("Abstürze (Diagnoseberichte)", crashes),

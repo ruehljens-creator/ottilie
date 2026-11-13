@@ -114,3 +114,47 @@ def test_alle_n_minuten_und_nur_eigene(watcher):
     (src / "Wahl.ptx").write_bytes(b"v3")
     w.before_close()
     assert (dst / "Wahl.ptx").read_bytes() == b"v2"
+
+
+def test_spiegel_entfernt_nur_eigene_begleitdateien(tmp_path, monkeypatch):
+    """SMB ohne erweiterte Attribute (11.11.2026): Begleitdateien eigener Dateien und eben angelegter Ordner weg,
+    fremde im Filmordner bleiben (Regel 03.10.2026)."""
+    from tonmischung.workflow import mirror as M
+    ad = b"\x00\x05\x16\x07" + b"\x00" * 60
+    src = tmp_path / "Session"
+    (src / "Audio Files").mkdir(parents=True)
+    (src / "S.ptx").write_bytes(b"1")
+    (src / "Audio Files" / "a.wav").write_bytes(b"2")
+    film = tmp_path / "film"
+    film.mkdir()
+    (film / "._fremd.mxf").write_bytes(ad)
+    (film / "._weg.mxf").write_bytes(ad)                             # verwaist, aber im Filmordner: bleibt
+
+    def copy(a, b):                                                   # wie smbfs: Begleitdateien für Datei und Ordner
+        os.makedirs(os.path.dirname(b), exist_ok=True)
+        open(b, "wb").write(open(a, "rb").read())
+        for p in (b, str(film / "Ton"), str(film / "Ton" / "ProTools")):
+            open(os.path.join(os.path.dirname(p), "._" + os.path.basename(p)), "wb").write(ad)
+    dst = film / "Ton" / "ProTools" / "Session"
+    r = M.mirror(str(src), str(dst), copy=copy)
+    assert len(r.copied) == 2
+    left = sorted(os.path.relpath(os.path.join(d, n), film) for d, ds, fs in os.walk(film)
+                  for n in ds + fs if n.startswith("._"))
+    assert left == ["._fremd.mxf", "._weg.mxf"]
+
+
+def test_spiegel_raeumt_nicht_hinter_einem_verweis(tmp_path):
+    """Sicherheit 11.11.2026: „Audio Files“ im Spiegel als Verweis auf einen fremden Ordner – dort nichts löschen."""
+    from tonmischung.workflow import mirror as M
+    ad = b"\x00\x05\x16\x07" + b"\x00" * 60
+    src = tmp_path / "Session"
+    (src / "Audio Files" / "sub").mkdir(parents=True)
+    (src / "Audio Files" / "sub" / "x.wav").write_bytes(b"2")
+    victim = tmp_path / "fremd" / "sub"
+    victim.mkdir(parents=True)
+    (victim / "._weg.wav").write_bytes(ad)                            # verwaist, aber fremd
+    dst = tmp_path / "Spiegel"
+    dst.mkdir()
+    os.symlink(tmp_path / "fremd", dst / "Audio Files")
+    M.mirror(str(src), str(dst))
+    assert (victim / "._weg.wav").exists()

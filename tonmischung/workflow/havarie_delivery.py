@@ -33,6 +33,7 @@ from tonmischung.delivery import mux as M
 from tonmischung.delivery import qc as Q
 from tonmischung.delivery import report as R
 from tonmischung.delivery import transfer as T
+from tonmischung.delivery.manifest import clip_name
 from tonmischung.delivery.picture import find_picture, program_start
 from tonmischung.sessions.pt_export import EXPORT_FOLDER
 from tonmischung.delivery.profiles import decide_mode, profile
@@ -187,7 +188,8 @@ def file_part(req: Request, wavs: Mapping[str, str], get: Callable[[str], Any], 
                                   "videoid": req.videoid, "projektId": req.project_id}, also=local_targets)
     job = M.MuxJob(pic.path, sources, os.path.join(out_dir, stem + ".mxf"), prof, mode, split_mono=split,
                    program_offset_s=ps.offset_s, keep_leader=str(req.preset.get("startband")) == "behalten",
-                   afd=int(req.preset.get("afd") or 8), use_bmx=str(req.preset.get("werkzeug") or "bmx") == "bmx")
+                   afd=int(req.preset.get("afd") or 8), use_bmx=str(req.preset.get("werkzeug") or "bmx") == "bmx",
+                   clip=clip_name(req.videoid, req.title))     # Jens 11.11.2026: VideoID in den Clipnamen
     mr = M.run(job, ffmpeg=tools.ffmpeg, ffprobe=tools.ffprobe, bmx=tools.bmx, on_progress=progress.update)
     res.sendefile = mr.path
     journal.meta.update({"Sendefile": mr.path, "Profil": prof.key, "Version": str(version)})

@@ -1,0 +1,9 @@
+# Zentrale (nur im Container, nicht im App-Paket) – Jens 11.11.2026: starlette, uvicorn, websockets.
+starlette==1.2.0
+uvicorn==0.48.0
+websockets==17.4
+anyio==4.13.0
+idna==3.17
+h11==0.16.0
+click==8.4.1
+typing-extensions==4.15.0

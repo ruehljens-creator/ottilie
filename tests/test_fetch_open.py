@@ -209,3 +209,17 @@ def test_premiere_sequenz_und_sessionbeginn(setup, monkeypatch):
     engine.start_time = "10:00:10:00"
     with pytest.raises(FetchError, match="Session erst bei 10:00:10:00 .*nichts verändert"):
         run(OpenImportOptions("bleibt", "neue_spuren", "programmbeginn"))
+
+
+def test_vorher_beitrag_scheitert_import_bleibt_erfolg(setup, monkeypatch):
+    """Ausfall R4, S2: lässt sich der bisherige Beitrag in Helmut nicht ändern (Konflikt im Nachtrag), ist der Import
+    trotzdem fertig – Hinweis statt Fehler, sonst importierte ein zweiter Versuch das AAF doppelt."""
+    from tonmischung.core.mixstate import ConflictError
+
+    def blocked(*a, **k):
+        raise ConflictError("Konflikt im Nachtrag an Helmut")
+    monkeypatch.setattr(fo, "_handle_previous", blocked)
+    run, engine, m, tmp_path = setup
+    r = run(OpenImportOptions("bleibt", "neue_spuren", "einfuegemarke", "zurueckgeben"))
+    assert r.previous_action == "unverändert" and any("in Helmut nicht geändert" in w for w in r.warnings)
+    assert m.mix_value("neu", "zustand") == "importiert"

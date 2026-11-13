@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from tonmischung.core.fileio import CorruptFileError, read_json, set_aside, write_json
+from tonmischung.core.fileio import SHARED_FILE_MODE, CorruptFileError, file_lock, read_json, set_aside, write_json
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class MixLog:
 
     def _read(self) -> list[dict]:
         try:
-            data = read_json(self.path, expect=dict)
+            data = read_json(self.path, expect=dict, shared=True)
         except CorruptFileError as e:
             moved = set_aside(self.path)
             log.error("Verzeichnis der Mischungen war beschädigt (%s) – beiseitegelegt als „%s“",
@@ -56,12 +56,15 @@ class MixLog:
             return []
         return [e for e in (data or {}).get("eintraege", []) if isinstance(e, dict)]
 
+    def lock_path(self) -> Path:
+        return self.path.with_name(f"{self.path.stem}.lock")
+
     def add(self, record: MixRecord) -> MixRecord:
         record.zeit = record.zeit or self._now().strftime("%Y-%m-%d %H:%M")
-        with self._lock:
+        with self._lock, file_lock(self.lock_path()):          # auch zwischen den Benutzern des Macs
             entries = self._read()
             entries.append(asdict(record))
-            write_json(self.path, {"version": 1, "eintraege": entries[-MAX_ENTRIES:]})
+            write_json(self.path, {"version": 1, "eintraege": entries[-MAX_ENTRIES:]}, mode=SHARED_FILE_MODE)
         return record
 
     def entries(self) -> list[dict]:
@@ -71,7 +74,7 @@ class MixLog:
 
     def clear(self) -> int:
         """Verzeichnis leeren; Rückgabe: Anzahl der entfernten Einträge."""
-        with self._lock:
+        with self._lock, file_lock(self.lock_path()):
             n = len(self._read())
-            write_json(self.path, {"version": 1, "eintraege": []})
+            write_json(self.path, {"version": 1, "eintraege": []}, mode=SHARED_FILE_MODE)
         return n

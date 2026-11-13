@@ -122,6 +122,11 @@ class _MenuActions(NSObject):
     def reloadPage_(self, sender):  # noqa: N802
         self.window.web.reload()
 
+    def refreshList_(self, sender):  # noqa: N802
+        """⌘R: Liste neu einlesen (Mischer-Prüfung 11.11.2026: vorher lud ⌘R das ganze Fenster neu, auch mitten in
+        einem Ablauf). Das Neuladen des Fensters liegt auf ⌥⌘R."""
+        self.window.web.evaluateJavaScript_completionHandler_("window.refreshList && refreshList()", None)
+
     def showWindow_(self, sender):  # noqa: N802
         self.window.show()
 
@@ -132,7 +137,8 @@ class _MenuActions(NSObject):
 def install_main_menu(window: "MainWindow", quit: Callable[[Any], None] | None = None) -> list[str]:
     """Hauptmenü wie bei Mac-Apps üblich – ohne „Bearbeiten“ gehen Kopieren/Einsetzen im
     Suchfeld nicht, ohne „Darstellung“ kein Zoom (Barrierefreiheit). Gibt die Menütitel zurück."""
-    from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagShift, NSMenu, NSMenuItem
+    from AppKit import (NSEventModifierFlagCommand, NSEventModifierFlagOption, NSEventModifierFlagShift, NSMenu,
+                        NSMenuItem)
     actions = _MenuActions.alloc().init()
     actions.window = window
     actions.quit = quit
@@ -150,7 +156,10 @@ def install_main_menu(window: "MainWindow", quit: Callable[[Any], None] | None =
             mi = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(label, action, key)
             if rest and rest[0] == "shift":
                 mi.setKeyEquivalentModifierMask_(NSEventModifierFlagCommand | NSEventModifierFlagShift)
-            if action in ("zoomIn:", "zoomOut:", "zoomReset:", "reloadPage:", "showWindow:", "quitApp:"):
+            if rest and rest[0] == "option":
+                mi.setKeyEquivalentModifierMask_(NSEventModifierFlagCommand | NSEventModifierFlagOption)
+            if action in ("zoomIn:", "zoomOut:", "zoomReset:", "reloadPage:", "refreshList:", "showWindow:",
+                          "quitApp:"):
                 mi.setTarget_(actions)
             menu.addItem_(mi)
         top.setSubmenu_(menu)
@@ -161,7 +170,8 @@ def install_main_menu(window: "MainWindow", quit: Callable[[Any], None] | None =
     submenu("Bearbeiten", [("Widerrufen", "undo:", "z"), ("Wiederholen", "redo:", "z", "shift"), None,
                            ("Ausschneiden", "cut:", "x"), ("Kopieren", "copy:", "c"), ("Einsetzen", "paste:", "v"),
                            ("Alles auswählen", "selectAll:", "a")])
-    submenu("Darstellung", [("Neu laden", "reloadPage:", "r"), None, ("Größer", "zoomIn:", "+"),
+    submenu("Darstellung", [("Liste aktualisieren", "refreshList:", "r"),
+                            ("Fenster neu laden", "reloadPage:", "r", "option"), None, ("Größer", "zoomIn:", "+"),
                             ("Kleiner", "zoomOut:", "-"), ("Originalgröße", "zoomReset:", "0")])
     submenu("Fenster", [("Ottilie", "showWindow:", "1"), ("Minimieren", "performMiniaturize:", "m"),
                         ("Schließen", "performClose:", "w")])

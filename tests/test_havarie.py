@@ -123,6 +123,14 @@ def test_app_havarie_auftrag(tmp_path):
         assert done["state"] == "fertig", done["error"]
         hv = done["result"]["havarie"]
         assert ctx.queue.summary()["ohne_beitrag"] == [{"id": hv, "titel": "Bahnstreik"}]
+        m.add_project("p8", "Bahnstreik", "hs", state="in_mischung", mischer="Jens", raum="Ton 3")
+        with pytest.raises(CommandError, match="schon normal übernommen"):       # Ausfall R3: nicht überschreiben
+            catchup_app.assign_havarie(ctx, {"havarie": hv, "id": "p8"})
+        m.add_project("p7", "Bahnstreik", "hs", state="ausgeliefert", mischer="B. Bauer", raum="Ton 2")
+        with pytest.raises(CommandError, match="schon ausgeliefert"):           # Ausfall R7, M3
+            catchup_app.assign_havarie(ctx, {"havarie": hv, "id": "p7"})
+        with pytest.raises(CommandError, match="nicht gefunden"):               # Ausfall R7, K4: Tippfehler
+            catchup_app.assign_havarie(ctx, {"havarie": hv, "id": "p99"})
         r = catchup_app.assign_havarie(ctx, {"havarie": hv, "id": "p9"})
         assert r["offen"] == 0 and m.mix_value("p9", "zustand") == "importiert"
     finally:

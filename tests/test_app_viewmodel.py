@@ -130,3 +130,15 @@ def test_ansichten_nach_zeit_und_sendung_und_suche():
     assert [r["id"] for r in viewmodel.rows(items, "Jens", "Ton 3", query="wolf")["rows"]] == ["2"]      # Mischer
     assert [r["id"] for r in viewmodel.rows(items, "Jens", "Ton 3", query="ton 2")["rows"]] == ["2"]     # Raum
     assert [r["id"] for r in viewmodel.rows(items, "Jens", "Ton 3", query="heimat streik")["rows"]] == ["3"]
+
+
+def test_gesperrt_ohne_besitzer_bietet_uebernehmen(ctx):
+    """Jens 11.11.2026: Sperre ohne Besitzer – Übernehmen wird angeboten, mit Hinweis."""
+    from tonmischung.helmut.mapping import Asset, Contribution, Handover
+    from tonmischung.core.mixstate import MixState
+    h = Handover(Asset("a", "B.aaf", "/H/B.aaf"), None, None)
+    c = Contribution("x", "T", "S", True, MixState())
+    d = viewmodel.detail(c, h, "Jens", "Ton 3")
+    assert d["actions"]["fetch"] is True and any("von keinem Mischer übernommen" in b["text"] for b in d["banners"])
+    fremd = Contribution("x", "T", "S", True, MixState("ausgeliefert", "A. Wolf", "Ton 2"))
+    assert viewmodel.detail(fremd, h, "Jens", "Ton 3")["actions"]["fetch"] is False

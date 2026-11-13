@@ -54,7 +54,7 @@ def test_duplikat_ohne_mischstand_bleibt_frei(ctx):
     m = ctx.mock
     d = commands.duplicate(ctx, {"id": "w", "title": "Wahl – Ersatz"})
     assert m.mix_value(d["id"], "zustand") == "bereit" and m.status(d["id"]) in (None, "UNLOCKED")
-    assert m.mix_value(d["id"], "duplikat_mischstand") == "" and d["reopen"] is None
+    assert not m.mix_value(d["id"], "duplikat_mischstand") and d["reopen"] is None        # leer oder nicht angelegt
     assert d["actions"]["fetch_label"] == "Übernehmen"
 
 

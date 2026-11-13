@@ -190,3 +190,11 @@ def test_viel_fehlerausgabe_blockiert_ffmpeg_nicht():
     fail = spam + "sys.stderr.write('Datei kaputt\\n'); sys.exit(3)\n"
     with pytest.raises(M.MuxError, match=r"ffmpeg-Fehler \(3\): .*Warnung 19999.*\| Datei kaputt"):
         M.run_ffmpeg([sys.executable, "-c", fail], 1.0, lambda f: None, stall_s=5.0)
+
+
+def test_clipname_an_bmx():
+    """Jens 11.11.2026: VideoID in den Clipnamen – ARD-ZDF-konform (Name des Material Package, keine DM)."""
+    cmd = M.bmx_command(_job(clip="VID-0142 Bahnstreik"), "/bin/bmx", "/t/i.mxf", "/t/p.mxf", "09:59:50:00")
+    assert cmd[:6] == ["/bin/bmx", "-t", "rdd9", "--ard-zdf-hdf", "--afd", "8"]
+    assert cmd[cmd.index("--clip") + 1] == "VID-0142 Bahnstreik" and cmd[-3:] == ["-o", "/t/p.mxf", "/t/i.mxf"]
+    assert "--clip" not in M.bmx_command(_job(), "/bin/bmx", "/t/i.mxf", "/t/p.mxf", "09:59:50:00")

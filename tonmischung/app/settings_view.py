@@ -11,7 +11,7 @@ import shutil
 from collections.abc import Mapping
 from typing import Any
 
-from tonmischung.config.settings import LAYER_MDM, Settings, SettingLockedError, validate
+from tonmischung.config.settings import LAYER_CENTRAL, LAYER_MDM, Settings, SettingLockedError, validate
 
 # Titel, die im Schema fehlen (wie im Prototyp)
 TITLES = {
@@ -20,10 +20,10 @@ TITLES = {
     "export.baton": "BATON", "export.aktives_preset": "Aktives Preset",
 }
 LAYER_TEXT = {"mdm": "Geräteverwaltung – gesperrt", "spurprofil": "aus dem Spurprofil der offenen Session",
-              "zentral": "zentral", "lokal": "lokal geändert", "standard": "Hausstandard", "nutzer": "Nutzer"}
-SOURCE_HINT = {"helmut": "wird später zentral über Helmut verwaltet – bis dahin lokal",
-               "helmut-nutzer": "wird später je Nutzer in Helmut gespeichert – bis dahin lokal",
-               "mdm": "kommt aus der Geräteverwaltung, wenn dort festgelegt"}
+              "zentral": "von der Zentrale vorgegeben – gesperrt",
+              "lokal": "lokal geändert", "standard": "Hausstandard", "nutzer": "Nutzer"}
+# Nur ein echter Weg wird genannt; „über Helmut verwalten“ gibt es nicht (13.11.2026: Vorgaben macht die Zentrale)
+SOURCE_HINT = {"mdm": "kommt aus der Geräteverwaltung, wenn dort festgelegt"}
 SKIP = {"schema_version"}
 
 
@@ -100,9 +100,8 @@ def areas(schema: Mapping) -> list[dict]:
                 loose = True
         if loose:
             sections.insert(0, {"id": key, "title": "Allgemein"})
-        if key == "system":                                   # ohne eigene Felder: Einstellungen übertragen
-            sections.append({"id": "system.einstellungen_uebertragen", "title": "Einstellungen übertragen"})
-            sections.append({"id": "system.ueber", "title": "Über Ottilie"})        # Software und Lizenzen
+        if key == "system":                                   # ohne eigene Felder: Software und Lizenzen
+            sections.append({"id": "system.ueber", "title": "Über Ottilie"})
         out.append({"id": key, "title": _title(key, node), "sections": sections})
     return out
 
@@ -201,7 +200,7 @@ def field_view(settings: Settings, schema: Mapping, path: str, errors: list[str]
                                            if layer == "spurprofil" else
                                            f"Nutzer „{settings.user_label}“" if layer == "nutzer" else
                                            LAYER_TEXT.get(layer, layer)),
-            "locked": layer in (LAYER_MDM, "spurprofil"),
+            "locked": layer in (LAYER_MDM, "spurprofil", LAYER_CENTRAL),
             "resettable": layer in ("lokal", "nutzer"), "hints": hints, "errors": errors or [],
             "options": list(node.get("enum", [])), "min": node.get("minimum"), "max": node.get("maximum"),
             "step": node.get("multipleOf"), "integer": node.get("type") == "integer"}
@@ -269,6 +268,9 @@ def set_value(settings: Settings, schema: Mapping, path: str, value: Any) -> dic
         raise KeyError(f"Unbekannte Einstellung: {path}")
     node = _resolve(schema, settings.fields[path].node)
     errors = validate(node, value, _title(path, node))
+    if not errors and settings.source(path) == LAYER_CENTRAL:
+        # sonst gespeichert, aber wirkungslos – „zentral“ geht vor „lokal“ (Review 12.11.2026)
+        errors = ["Wird von der Ottilie-Zentrale vorgegeben – dort in der Administration ändern"]
     if not errors:
         try:
             settings.set_local(path, value)

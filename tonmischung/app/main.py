@@ -98,7 +98,8 @@ def _report_problems(ctx: AppContext, notify: Callable[[str, str, str], None], m
     from tonmischung.ptsl.dialogs import SCREEN_CAPTURE_HINT, screen_capture_allowed
     moved = paths.LAST if "nicht übernommen" in paths.LAST else ""
     capture = SCREEN_CAPTURE_HINT if screen_capture_allowed() is False and not mock else ""
-    for problem in (ctx.settings.local_problem, getattr(ctx.queue, "problem", ""), moved, capture):
+    for problem in (ctx.settings.local_problem, getattr(ctx.queue, "problem", ""), moved, capture,
+                    ctx.extra.get("datenordner_hinweis", "")):
         if problem:
             notify("Ottilie", "Bitte prüfen", problem)
 
@@ -189,13 +190,13 @@ def _menubar(ctx: AppContext, window, punch, voc, runner: JobRunner, notify: Cal
 
 def _start_timers(ctx: AppContext, runner: JobRunner, foreign, mirror_w, peers) -> None:
     """Takte: Nachtrag (60 s, solange etwas offen ist), fremde Dateien, Spiegeln, Spurprofil der offenen Session,
-    Raumstatus (Helmut und Bonjour)."""
+    Raumstatus (an die Zentrale)."""
     from tonmischung.app.profile_binder import ProfileBinder
-    from tonmischung.app.roomstatus import RoomPublisher
+    from tonmischung.app.roomstatus import TICK_S, RoomPublisher
 
     def catch_up_tick() -> None:
         if ctx.queue is not None and ctx.queue.pending():
-            log.info("Nachtrag: %s", catch_up(ctx)["text"])
+            log.info("Nachtrag: %s", catch_up(ctx, {"nur_eigene": True})["text"])
     every(60.0, catch_up_tick, "tm-nachtrag")
     every(max(float(ctx.settings.get("import.session_ablage.fremde_dateien.abfrage_intervall_s") or 30), 10.0),
           foreign.check, "tm-fremd")
@@ -204,8 +205,7 @@ def _start_timers(ctx: AppContext, runner: JobRunner, foreign, mirror_w, peers) 
     ctx.extra["profile_binder"] = binder
     every(5.0, binder.tick, "tm-spurprofil")
     publisher = RoomPublisher(ctx, runner.running, peers)
-    every(max(float(ctx.settings.get("system.raeume_nutzer.raumstatus.intervall_s") or 5), 2.0),
-          publisher.tick, "tm-raumstatus")
+    every(TICK_S, publisher.tick, "tm-raumstatus")
 
 
 def run(mock: bool = False, selftest: bool = False, auto: str = "") -> int:
@@ -222,13 +222,14 @@ def run(mock: bool = False, selftest: bool = False, auto: str = "") -> int:
 
     from tonmischung import watchdog
     from tonmischung.app import pt_queries, punch_app, rooms_app, users_app, vocaster_app
-    from tonmischung.app.bonjour import BonjourPeers
     from tonmischung.app.window import MainWindow, install_main_menu
 
     # 1. Kontext: Einstellungen, Helmut, Pro Tools, Nutzer und Raum
     ctx = AppContext.create(mock=mock)
     users_app.startup(ctx, selftest=selftest)      # Standard-Nutzer anmelden, sonst fragt das Fenster
-    rooms_app.startup(ctx)                         # Raumliste aus der Ablage, Raum dieses Macs
+    rooms_app.startup(ctx)                         # Raumname dieses Macs (frühere Raumliste einmal umgestellt)
+    from tonmischung.app import zentrale_app
+    zentrale_app.initial_room(ctx)                 # gekoppelt: zuletzt bekannter Raum der Zentrale
     no_nap = prevent_app_nap()                     # Referenz halten, solange die App läuft
     if not selftest:
         partner_app_nap_off()
@@ -245,6 +246,8 @@ def run(mock: bool = False, selftest: bool = False, auto: str = "") -> int:
     window = MainWindow(on_message=bridge.handle, fragment=f"auto={auto}" if (selftest and auto) else "")
     holder["window"] = window
     runner = JobRunner(bridge)
+    from tonmischung.dropfolder.netmount import MOUNTER
+    MOUNTER.busy = runner.busy                      # Übergabeordner nie während Import/Export neu einbinden
     runner.ptsl = ctx.ptsl
     register_all(bridge, ctx, runner)
     pt_queries.register(bridge, ctx.ptsl)
@@ -269,9 +272,9 @@ def run(mock: bool = False, selftest: bool = False, auto: str = "") -> int:
     vocaster_app.add_commands(punch.commands, voc)
     vocaster_app.register(bridge, voc)
 
-    # 4. Raumstatus direkt per Bonjour (Jens 03.10.2026), Beobachter, Exporte, Webtrigger und API
-    peers = BonjourPeers(ctx.room, ctx.settings.get("system.streamdeck_webtrigger.port") or 8899, AppHelper.callAfter,
-                         browse=ctx.settings.get("system.raeume_nutzer.raumstatus.quelle") != "nur_helmut")
+    # 4. Zentrale (Raumstatus, Chat, Belegen, Vorgaben), Beobachter, Exporte, Webtrigger und API
+    peers = zentrale_app.setup(ctx, bridge, notify=lambda title, text, sound: AppHelper.callAfter(
+        rumps.notification, "Ottilie", title, text, sound=sound), runner=runner)
     peers.start()
     ctx.extra["peers"] = peers
     foreign, mirror_w = _start_watchers(ctx, runner, notify)
@@ -292,7 +295,7 @@ def run(mock: bool = False, selftest: bool = False, auto: str = "") -> int:
             voc.controller.shutdown()                # trennt sicher seit punchbuddy-protools 1124b7c
         if api is not None:
             api.stop()
-        peers.stop()                                 # Bonjour-Anmeldung zurücknehmen
+        peers.stop()                                 # Zentrale trennen
         bridge.close()
         ctx.close()
     shutdown = install_shutdown(cleanup, exit=lambda: rumps.quit_application(),

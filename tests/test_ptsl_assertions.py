@@ -128,3 +128,15 @@ def test_fortschrittsbalken_ist_keine_meldung():
         client.on_dialog = notes.append
         client.close()
         assert notes == [want, ""] and "close_session(save_on_close=True)" in engine.calls
+
+
+def test_debug_assertion_und_stacktrace_zaehlen_nicht():
+    """Live 11.11.2026: Debug-Assertion der Steuerfläche beim Anlegen einer Session – kein Grund zum Abbrechen."""
+    debug = ('2671125.395345,00103,0e0f: PtApp_Assert(Debug): "false", /Users/autobld/gitlabci/PT/release/2026/r1/'
+             'ProTools/App/MIDI_Personalities/Personalities/Mackie_Controllers/UHUIController.cpp Line 3687, Thread: '
+             'Main Thread (id=kThreadTableID_MainThread)')
+    frame = "\t0x1612bdcc0 : PtApp_Assert::Install() + 12440 (ProTools_Green @ 0x160000000)"
+    assert assertion_lines(f"{debug}\nStacktrace:\n{frame}\n") == []
+    assert assertion_lines(f"{debug}\n{LINE}\n") == [LINE]
+    fatal = 'PtApp_Assert(Fatal): "x", Foo.cpp Line 1'                # künftige Stufe: zählt
+    assert assertion_lines(fatal) == [fatal]

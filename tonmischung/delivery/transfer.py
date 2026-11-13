@@ -26,7 +26,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from tonmischung.core.fileio import publish_new, same_content
+from tonmischung.core.fileio import APPLEDOUBLE_MAGIC, publish_new, same_content
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +36,6 @@ TEMP_SUFFIX = ".uploading"
 STALE_UPLOAD_S = 120.0                         # so lange unverändert → eigene Teilkopie eines abgebrochenen Versuchs
 FAT32_MAX = 4 * 1024 ** 3 - 1                  # größte Datei auf FAT32
 HAVARIE_FOLDER = "Ottilie Havarie"         # Unterordner auf Schreibtisch und USB-Stick
-APPLEDOUBLE_MAGIC = b"\x00\x05\x16\x07"
 BLOCK = 1 << 16
 
 

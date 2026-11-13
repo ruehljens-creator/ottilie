@@ -20,9 +20,10 @@ def test_schema_felder_und_quellen():
     fields = schema_fields(load_schema())
     assert fields[LUFS].default == -23
     assert fields[PTSL_TIMEOUT].source == "mdm"
-    assert fields["persoenlich.templates"].source == "helmut-nutzer"
+    assert fields["persoenlich.templates"].source == "nutzer"
     quellen = Counter(f.source for f in fields.values())
-    assert quellen == {"helmut": 147, "mdm": 42, "lokal": 39, "helmut-nutzer": 6}    # − Kanäle 7/8, Stille (09.10.2026)
+    # − Kanäle 7/8, Stille (09.10.2026); + 21 Betriebsart Übergabeordner (11.11.2026); + 2 weitere Ordner (13.11.2026)
+    assert quellen == {"nutzer": 148, "mdm": 71, "lokal": 39}
     assert fields["import.zuordnungsregeln.aktiv"].default is True          # Triage abschaltbar
 
 
@@ -95,3 +96,14 @@ def test_mdm_doku_aktuell_und_plist_lesbar():
     assert "system.schnittstellen.helmut.adresse" in keys and not any(k.startswith("export.baton") for k in keys)
     data = plistlib.loads(mdm_doc.plist())
     assert data["system.schnittstellen.ptsl.adresse"] == "localhost:31416" and set(data) <= keys
+
+
+def test_unbekannte_schluessel_bleiben_in_der_datei(tmp_path):
+    """13.11.2026: Schlüssel, die diese Version nicht kennt (z. B. die Raumliste bis 0.2), gehen beim Speichern nicht
+    verloren – ein Zurück auf die ältere Version findet sie wieder."""
+    pfad = tmp_path / "e.json"
+    pfad.write_text(json.dumps({"system.raeume_nutzer.raeume": [{"name": "Ton 3"}], LUFS: -22}))
+    s = Settings(local_path=pfad)
+    assert s.unknown_local() == {"system.raeume_nutzer.raeume": [{"name": "Ton 3"}]} and s.get(LUFS) == -22
+    s.set_local(LUFS, -24)
+    assert json.loads(pfad.read_text()) == {"system.raeume_nutzer.raeume": [{"name": "Ton 3"}], LUFS: -24}

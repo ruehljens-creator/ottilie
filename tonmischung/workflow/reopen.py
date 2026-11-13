@@ -289,6 +289,7 @@ def restore_state(project_id: str, state_path: str, *, service: MixService, ptsl
     from tonmischung.core.backups import belongs_to
     progress = progress or NullProgress()
     progress.step("Prüfen", os.path.basename(state_path))
+    service.settle(project_id)              # ältere Nachträge vor dem Pro-Tools-Teil, nicht danach (Ausfall R4)
     c = service.client.get(project_id)
     m = c.mix
     if not m.session_path:
